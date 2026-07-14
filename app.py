@@ -354,6 +354,7 @@ else:
                     if st.form_submit_button("💾 PUANTAJI MERKEZE GÖNDER", use_container_width=True):
                         p_ad_parca = secilen_p.split(" (").strip()
                         p_tc_parca = secilen_p.split(" (").replace(")", "").strip()
+
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         df_puantaj_canli = df_puantaj_canli[~((df_puantaj_canli["TC_Kimlik"].astype(str) == str(p_tc_parca)) & (df_puantaj_canli["Dönem_Ay"] == donem_ay) & (df_puantaj_canli["Şantiye"] == st.session_state["santiye"]))]
                         yeni_puantaj = pd.DataFrame([{
