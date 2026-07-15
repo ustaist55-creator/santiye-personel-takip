@@ -49,9 +49,32 @@ try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     df_canli = conn.read(worksheet="Sayfa1", ttl=0)
     df_puantaj_canli = conn.read(worksheet="Sayfa2", ttl=0)
+    df_canli = df_canli.dropna(how="all")
+    df_puantaj_canli = df_puantaj_canli.dropna(how="all")
 except:
     df_canli = pd.DataFrame(columns=["Sıra No", "Adı Soyadı", "TC Kimlik No", "Doğum Tarihi", "İşe Giriş Tarihi", "İşten Çıkış Tarihi", "Birimi", "Şantiye Bilgisi", "Firma Bilgisi", "Giriş/Çıkış Durumu", "Çalışma Durumu", "Çıkış Gün Sayısı"])
     df_puantaj_canli = pd.DataFrame(columns=["Tarih_Saat", "Şantiye", "Personel_Adi", "TC_Kimlik", "Dönem_Ay", "Çalışılan_Gün_Sayısı", "Giren_Sef"])
+
+# 🔒 GÜVENLİK YAMASI: Kilitlenme hatasını kaldıran resmi ve güvenli yazma fonksiyonu
+def google_tabloya_yaz(worksheet_adı, guncel_df):
+    try:
+        conn._instance.client.update(
+            spreadsheet=conn._structure.spreadsheet,
+            worksheet=worksheet_adı,
+            data=guncel_df
+        )
+        return True
+    except:
+        try:
+            st.connection("gsheets", type=GSheetsConnection)._instance.client.update(
+                spreadsheet=st.secrets["connectionsgsheets"]["spreadsheet"],
+                worksheet=worksheet_adı,
+                data=guncel_df
+            )
+            return True
+        except:
+            st.error("⚠️ Google Drive veri kilit açma hatası, lütfen butona tekrar basın.")
+            return False
 KULLANICILAR = {
     "istanbul": {"sifre": "5151", "santiye": "İSTANBUL", "rol": "sube"},
     "giresun": {"sifre": "5252", "santiye": "GİRESUN", "rol": "sube"},
@@ -163,15 +186,15 @@ else:
                         if mevcut_durum == "GİRİŞ (BEKLEMEDE)":
                             if st.button("✅ SGK GİRİŞİNE ONAY VER", use_container_width=True):
                                 df_canli.loc[df_canli["Sıra No"] == secilen_sira_no, "Giriş/Çıkış Durumu"] = "SGK GİRİŞİ YAPILDI"
-                                conn.update(worksheet="Sayfa1", data=df_canli)
-                                st.success("Durum başarıyla güncellendi!")
-                                st.rerun()
+                                if google_tabloya_yaz("Sayfa1", df_canli):
+                                    st.success("Durum başarıyla güncellendi!")
+                                    st.rerun()
                         elif mevcut_durum == "ÇIKIŞ (BEKLEMEDE)":
                             if st.button("🚫 SGK ÇIKIŞINA ONAY VER", use_container_width=True):
                                 df_canli.loc[df_canli["Sıra No"] == secilen_sira_no, "Giriş/Çıkış Durumu"] = "SGK ÇIKIŞI YAPILDI"
-                                conn.update(worksheet="Sayfa1", data=df_canli)
-                                st.success("Durum başarıyla güncellendi!")
-                                st.rerun()
+                                if google_tabloya_yaz("Sayfa1", df_canli):
+                                    st.success("Durum başarıyla güncellendi!")
+                                    st.rerun()
                     with o2: st.info("Siz onay verdiğiniz an Google Sheets veritabanı kalıcı olarak güncellenir.")
                 st.markdown("---")
 
@@ -238,9 +261,9 @@ else:
                             "Giriş/Çıkış Durumu": p_durum, "Çalışma Durumu": p_calisma, "Çıkış Gün Sayısı": hesaplanan_gun_metni
                         }])
                         df_canli = pd.concat([df_canli, yeni_personel]).sort_values(by="Sıra No")
-                        conn.update(worksheet="Sayfa1", data=df_canli)
-                        st.success("✔️ Google Sheets veritabanına kaydedildi!")
-                        st.rerun()
+                        if google_tabloya_yaz("Sayfa1", df_canli):
+                            st.success("✔️ Google Sheets veritabanına kaydedildi!")
+                            st.rerun()
                     else: st.error("❌ İsim ve TC boş geçilemez!")
             
             if not df_goster.empty:
@@ -252,9 +275,9 @@ else:
                     p_durumu_kontrol = df_canli[df_canli["Sıra No"] == s_sira]["Giriş/Çıkış Durumu"].values[0]
                     if "BEKLEMEDE" in str(p_durumu_kontrol).upper():
                         df_canli = df_canli[df_canli["Sıra No"] != s_sira]
-                        conn.update(worksheet="Sayfa1", data=df_canli)
-                        st.success("Personel silindi!")
-                        st.rerun()
+                        if google_tabloya_yaz("Sayfa1", df_canli):
+                            st.success("Personel silindi!")
+                            st.rerun()
                     else: st.error("🛑 Onaylanmış personel silinemez!")
         
         with col_sag_tablo:
@@ -278,7 +301,6 @@ else:
                     sefi_adi = st.text_input("Giriş Yapan Yetkili")
                     
                     if st.form_submit_button("💾 PUANTAJI MERKEZE GÖNDER", use_container_width=True):
-                        # 🎯 ZIRHLI PARÇALAMA MOTORU: Çeviri hassasiyeti hatası tamamen giderildi
                         p_ad_parca = secilen_p.split("(")[0].strip()
                         p_tc_parca = secilen_p.split("(")[1].replace(")", "").strip()
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -291,9 +313,9 @@ else:
                             "Dönem_Ay": donem_ay, "Çalışılan_Gün_Sayısı": int(calisilan_gun), "Giren_Sef": sefi_adi.upper()
                         }])
                         df_puantaj_canli = pd.concat([df_puantaj_canli, yeni_puantaj])
-                        conn.update(worksheet="Sayfa2", data=df_puantaj_canli)
-                        st.success("✔️ Puantaj kalıcı olarak kaydedildi!")
-                        st.rerun()
+                        if google_tabloya_yaz("Sayfa2", df_puantaj_canli):
+                            st.success("✔️ Puantaj kalıcı olarak kaydedildi!")
+                            st.rerun()
             
             if not df_p_goster.empty:
                 st.markdown("---")
@@ -302,9 +324,9 @@ else:
                 if st.button("❌ SEÇİLİ PUANTAJI LİSTEDEN SİL", use_container_width=True):
                     sil_tarih = secilen_sil_p.split(" | ")[0].strip()
                     df_puantaj_canli = df_puantaj_canli[df_puantaj_canli["Tarih_Saat"] != sil_tarih]
-                    conn.update(worksheet="Sayfa2", data=df_puantaj_canli)
-                    st.success("Puantaj kaydı silindi!")
-                    st.rerun()
+                    if google_tabloya_yaz("Sayfa2", df_puantaj_canli):
+                        st.success("Puantaj kaydı silindi!")
+                        st.rerun()
         
         with col_p2:
             st.markdown("##### 📋 Şantiyenizin Gönderdiği Puantaj Kayıtları")
@@ -335,9 +357,9 @@ else:
                 if st.button("❌ SEÇİLİ PERSONELİ VERİTABANINDAN TAMAMEN UÇUR", use_container_width=True):
                     m_s_sira = int(secilen_m_sil_p.split(" | ")[0].replace("Sıra No: ", "").strip())
                     df_canli = df_canli[df_canli["Sıra No"] != m_s_sira]
-                    conn.update(worksheet="Sayfa1", data=df_canli)
-                    st.success("Personel kartı veritabanından kalıcı olarak silindi!")
-                    st.rerun()
+                    if google_tabloya_yaz("Sayfa1", df_canli):
+                        st.success("Personel kartı veritabanından kalıcı olarak silindi!")
+                        st.rerun()
                     
         with tab2:
             pf1, pf2 = st.columns(2)
@@ -357,9 +379,9 @@ else:
                 if st.button("❌ SEÇİLİ PUANTAJI VERİTABANINDAN KALICI OLARAK SİL", use_container_width=True):
                     m_sil_tarih = secilen_m_sil.split(" | ")[0].strip()
                     df_puantaj_canli = df_puantaj_canli[df_puantaj_canli["Tarih_Saat"] != m_sil_tarih]
-                    conn.update(worksheet="Sayfa2", data=df_puantaj_canli)
-                    st.success("Puantaj veritabanından kalıcı olarak silindi!")
-                    st.rerun()
+                    if google_tabloya_yaz("Sayfa2", df_puantaj_canli):
+                        st.success("Puantaj veritabanından kalıcı olarak silindi!")
+                        st.rerun()
                     
         with tab3:
             st.markdown("#### 📊 Şantiye Canlı Dağılım Grafikleri")
