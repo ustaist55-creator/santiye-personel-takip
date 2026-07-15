@@ -4,6 +4,7 @@ import datetime
 import os
 import io
 import time
+import sqlite3  # Ebedi ve otomatik kilitli SQL veritabanı motoru
 import extra_streamlit_components as stx
 
 # Sayfa Ayarları - Birebir Kurumsal Geniş Ekran
@@ -40,34 +41,38 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 📡 DOĞRUDAN GOOGLE SPREADSHEET OKUMA MOTORU (BAĞLANTI KİLİTSİZ MODEL)
-def verileri_yukle_dogrudan():
-    try:
-        url = "https://google.com"
-        csv_url_sayfa1 = f"{url}/export?format=csv&gid=0"
-        csv_url_sayfa2 = f"{url}/export?format=csv&gid=1864551121"
-        
-        df_p = pd.read_csv(csv_url_sayfa1).dropna(how="all")
-        df_pt = pd.read_csv(csv_url_sayfa2).dropna(how="all")
-        return df_p, df_pt
-    except:
-        df_p = pd.DataFrame(columns=["Sıra No", "Adı Soyadı", "TC Kimlik No", "Doğum Tarihi", "İşe Giriş Tarihi", "İşten Çıkış Tarihi", "Birimi", "Şantiye Bilgisi", "Firma Bilgisi", "Giriş/Çıkış Durumu", "Çalışma Durumu", "Çıkış Gün Sayısı"])
-        df_pt = pd.DataFrame(columns=["Tarih_Saat", "Şantiye", "Personel_Adi", "TC_Kimlik", "Dönem_Ay", "Çalışılan_Gün_Sayısı", "Giren_Sef"])
-        return df_p, df_pt
+# 📡 OTOMATİK SQL VERİTABANI BAĞLANTISI VE TABLO KURUMLARI
+DB_YOLU = "santiye_master_veri.db"
 
-df_canli, df_puantaj_canli = verileri_yukle_dogrudan()
+def sql_altyapi_kur():
+    conn = sqlite3.connect(DB_YOLU)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS personel (
+            sira_no INTEGER PRIMARY KEY, adi_soyadi TEXT, tc_no TEXT, dogum_tarihi TEXT,
+            ise_giris TEXT, isten_cikis TEXT, birimi TEXT, santiye TEXT, firma TEXT,
+            durum TEXT, calisma_sekli TEXT, fark_gun TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS puantaj (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, tarih_satir TEXT, santiye TEXT,
+            personel_adi TEXT, tc_no TEXT, donem_ay TEXT, gun_sayisi INTEGER, giren_sef TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-# 🚀 ASLA KİLİTLENMEYEN DOĞRUDAN GOOGLE DRIVE YAZMA MOTORU
-def google_drive_yaz_dogrudan(worksheet_adi, guncel_df):
-    try:
-        temiz_df = guncel_df.astype(str).replace("nan", "-").replace("None", "-")
-        # Sorunlu ara bağlantı nesnelerini tamamen baypas ederek doğrudan sisteme işler
-        st.connection("gsheets").update(worksheet=worksheet_adi, data=temiz_df)
-        st.cache_data.clear()
-        return True
-    except:
-        st.error("⚠️ Google Drive bağlantı köprüsü yenileniyor, lütfen butona bir kez daha basın.")
-        return False
+sql_altyapi_kur()
+
+def verileri_yukle_sql():
+    conn = sqlite3.connect(DB_YOLU)
+    df_p = pd.read_sql_query("SELECT sira_no as 'Sıra No', adi_soyadi as 'Adı Soyadı', tc_no as 'TC Kimlik No', dogum_tarihi as 'Doğum Tarihi', ise_giris as 'İşe Giriş Tarihi', isten_cikis as 'İşten Çıkış Tarihi', birimi as 'Birimi', santiye as 'Şantiye Bilgisi', firma as 'Firma Bilgisi', durum as 'Giriş/Çıkış Durumu', calisma_sekli as 'Çalışma Durumu', fark_gun as 'Çıkış Gün Sayısı' FROM personel", conn)
+    df_pt = pd.read_sql_query("SELECT tarih_satir as 'Tarih_Saat', santiye as 'Şantiye', personel_adi as 'Personel_Adi', tc_no as 'TC_Kimlik', donem_ay as 'Dönem_Ay', gun_sayisi as 'Çalışılan_Gün_Sayısı', giren_sef as 'Giren_Sef' FROM puantaj", conn)
+    conn.close()
+    return df_p, df_pt
+
+df_canli, df_puantaj_canli = verileri_yukle_sql()
 KULLANICILAR = {
     "istanbul": {"sifre": "5151", "santiye": "İSTANBUL", "rol": "sube"},
     "giresun": {"sifre": "5252", "santiye": "GİRESUN", "rol": "sube"},
@@ -137,9 +142,7 @@ else:
     with col_u1:
         st.markdown(f"<h3 style='color: #2B6CB0; margin-top:0; font-family:sans-serif;'>💼 PERSONEL TAKİP | {st.session_state['santiye']}</h3>", unsafe_allow_html=True)
     with col_u2:
-        if st.button("Canlı Verileri Yenile", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+        if st.button("Canlı Verileri Yenile", use_container_width=True): st.rerun()
     with col_u3:
         if st.button("SİSTEMDEN GÜVENLİ ÇIKIŞ", use_container_width=True):
             st.session_state["giris_yapildi"] = False
@@ -157,14 +160,6 @@ else:
         df_p_goster = df_puantaj_canli.copy()
 
     df_bekleyen_sayi = df_canli[df_canli["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])] if not df_canli.empty else pd.DataFrame()
-
-    st.markdown("---")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Onaylı Aktif Çalışan", len(df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"]) if not df_goster.empty else 0)
-    m2.metric("Onay Bekleyen Hareketler", len(df_goster[df_goster["Giriş/Çıkış Durumu"].astype(str).str.contains("BEKLEMEDE", na=False)]) if not df_goster.empty else 0)
-    m3.metric("Toplam Kartlı Personel", len(df_goster) if not df_goster.empty else 0)
-    m4.metric("Toplam Puantaj Gün Sayısı", int(df_p_goster["Çalışılan_Gün_Sayısı"].astype(float).sum()) if not df_p_goster.empty else 0)
-    st.markdown("---")
     if st.session_state["rol"] == "merkez":
         if not df_bekleyen_sayi.empty:
             with st.expander("🔔 ŞANTİYELERDEN GELEN ONAY BEKLEYEN HAREKETLER", expanded=True):
@@ -174,13 +169,16 @@ else:
                     secilen_sira_no = int(str(secilen_islem_metni).split("Sıra No: ").split(" |").strip())
                     o1, o2 = st.columns(2)
                     with o1:
-                        if st.button("✅ HAREKETİ GOOGLE DRIVE'DA ONAYLA", use_container_width=True):
-                            df_canli.loc[df_canli["Sıra No"].astype(str) == str(secilen_sira_no), "Giriş/Çıkış Durumu"] = "SGK GİRİŞİ YAPILDI"
-                            if google_drive_yaz_dogrudan("Sayfa1", df_canli):
-                                st.success("İşlem Google Drive'da başarıyla onaylandı!")
-                                time.sleep(1)
-                                st.rerun()
-                    with o2: st.info("Siz onay verdiğiniz an tüm şantiye ekranları anında ortak güncellenir.")
+                        if st.button("✅ HAREKETİ SİSTEME ONAYLA", use_container_width=True):
+                            conn = sqlite3.connect(DB_YOLU)
+                            cursor = conn.cursor()
+                            cursor.execute("UPDATE personel SET durum = 'SGK GİRİŞİ YAPILDI' WHERE sira_no = ?", (secilen_sira_no,))
+                            conn.commit()
+                            conn.close()
+                            st.success("İşlem SQL veritabanında otomatik onaylandı!")
+                            time.sleep(0.5)
+                            st.rerun()
+                    with o2: st.info("Siz onay verdiğiniz an tüm şantiye ekranları canlı ortak güncellenir.")
                 st.markdown("---")
 
     if st.session_state["rol"] == "sube" and menu_secim == "Personel Giriş / Çıkış":
@@ -229,25 +227,28 @@ else:
                 
                 st.text_input("ÇIKIŞ GÜN SAYISI (Otomatik)", value=hesaplanan_gun_metni, disabled=True, key="c_gun_otomatik_gosterge")
                 
-                if st.form_submit_button("💾 VERİYİ GOOGLE EXCEL'E İŞLE", use_container_width=True):
+                if st.form_submit_button("💾 VERİYİ OTOMATİK VERİTABANINA İŞLE", use_container_width=True):
                     if p_adi.strip() != "" and p_tc.strip() != "":
+                        conn = sqlite3.connect(DB_YOLU)
+                        cursor = conn.cursor()
+                        
                         if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and varsayilan_sira is not None:
-                            df_canli = df_canli[df_canli["Sıra No"].astype(str) != str(varsayilan_sira)]
+                            cursor.execute("DELETE FROM personel WHERE sira_no = ?", (varsayilan_sira,))
                             sira_no = varsayilan_sira
-                        else: sira_no = int(df_canli["Sıra No"].astype(float).max() + 1) if not df_canli.empty else 1
+                        else:
+                            cursor.execute("SELECT MAX(sira_no) FROM personel")
+                            max_val = cursor.fetchone()[0]
+                            sira_no = int(max_val + 1) if max_val else 1
                         
-                        yeni_personel_row = pd.DataFrame([{
-                            "Sıra No": int(sira_no), "Adı Soyadı": p_adi.strip().upper(), "TC Kimlik No": str(p_tc.strip()),
-                            "Doğum Tarihi": str(p_dogum), "İşe Giriş Tarihi": str(p_ise_giris), "İşten Çıkış Tarihi": str(p_isten_cikis),
-                            "Birimi": str(p_birim), "Şantiye Bilgisi": str(st.session_state["santiye"]), "Firma Bilgisi": p_firma.strip().upper(),
-                            "Giriş/Çıkış Durumu": str(p_durum), "Çalışma Durumu": str(p_calisma), "Çıkış Gün Sayısı": str(hesaplanan_gun_metni)
-                        }])
-                        df_canli = pd.concat([df_canli, yeni_personel_row]).sort_values(by="Sıra No")
+                        cursor.execute("""
+                            INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), p_firma.strip().upper(), str(p_durum), str(p_calisma), str(hesaplanan_gun_metni)))
+                        conn.commit()
+                        conn.close()
                         
-                        if google_drive_yaz_dogrudan("Sayfa1", df_canli):
-                            st.success("✔️ Google Excel'e başarıyla kilitlendi ve form temizlendi!")
-                            time.slice(1)
-                            st.rerun()
+                        st.success("✔️ SQL Veritabanına saniyesinde otomatik işlendi ve form temizlendi!")
+                        time.sleep(0.5)
+                        st.rerun()
                     else: st.error("❌ İsim ve TC boş geçilemez!")
     elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
         st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
@@ -269,18 +270,16 @@ else:
                         p_tc_parca = str(secilen_p).split(" (").replace(")", "").strip()
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         
-                        if not df_puantaj_canli.empty:
-                            df_puantaj_canli = df_puantaj_canli[~((df_puantaj_canli["TC_Kimlik"].astype(str) == str(p_tc_parca)) & (df_puantaj_canli["Dönem_Ay"] == donem_ay) & (df_puantaj_canli["Şantiye"] == st.session_state["santiye"]))]
-                        
-                        yeni_puantaj_row = pd.DataFrame([{
-                            "Tarih_Saat": su_an_p, "Şantiye": str(st.session_state["santiye"]), "Personel_Adi": str(p_ad_parca), "TC_Kimlik": str(p_tc_parca),
-                            "Dönem_Ay": str(donem_ay), "Çalışılan_Gün_Sayısı": int(calisilan_gun), "Giren_Sef": sefi_adi.upper()
-                        }])
-                        df_puantaj_canli = pd.concat([df_puantaj_canli, yeni_puantaj_row])
-                        if google_drive_yaz_dogrudan("Sayfa2", df_puantaj_canli):
-                            st.success("✔️ Puantaj kalıcı olarak e-tabloza eklendi ve form temizlendi!")
-                            time.sleep(1)
-                            st.rerun()
+                        conn = sqlite3.connect(DB_YOLU)
+                        cursor = conn.cursor()
+                        cursor.execute("DELETE FROM puantaj WHERE tc_no = ? AND donem_ay = ? AND santiye = ?", (p_tc_parca, donem_ay, st.session_state["santiye"]))
+                        cursor.execute("INSERT INTO puantaj (tarih_satir, santiye, personel_adi, tc_no, donem_ay, gun_sayisi, giren_sef) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                       (su_an_p, str(st.session_state["santiye"]), str(p_ad_parca), str(p_tc_parca), str(donem_ay), int(calisilan_gun), sefi_adi.upper()))
+                        conn.commit()
+                        conn.close()
+                        st.success("✔️ Puantaj SQL veritabanına otomatik kilitlendi!")
+                        time.sleep(0.5)
+                        st.rerun()
 
         with col_p2:
             st.markdown("##### 📋 Şantiyenizin Gönderdiği Puantaj Kayıtları")
