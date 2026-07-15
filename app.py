@@ -166,7 +166,7 @@ else:
                 bekleyen_listesi = df_bekleyen_sayi.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_islem_metni = st.selectbox("Onaylanacak Personel Kartını Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
-                    secilen_sira_no = int(str(secilen_islem_metni).split("Sıra No: ")[1].split(" |")[0].strip())
+                    secilen_sira_no = int(str(secilen_islem_metni).split("Sıra No: ").split(" |").strip())
                     o1, o2 = st.columns(2)
                     with o1:
                         if st.button("✅ HAREKETİ SİSTEME ONAYLA", use_container_width=True):
@@ -186,7 +186,7 @@ else:
         with col_sol_form:
             st.markdown("##### 📥 PERSONEL KART TANIMLAMA")
             islem_modu = st.radio("Mod", ["Sıfırdan Yeni Personel Ekle", "Var Olan Personeli Güncelle / Çıkış Yap"], label_visibility="collapsed")
-            varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris, varsayilan_cikis, varsayilan_sira = "", "", "", "", "-", None
+            varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris, varsayilan_cikis, varsayilan_sira, varsayilan_fark = "", "", "", "", "-", None, ""
             
             df_guncellenebilir_havuz = df_goster[df_goster["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)", "SGK GİRİŞİ YAPILDI"])] if not df_goster.empty else pd.DataFrame()
             
@@ -194,12 +194,12 @@ else:
                 p_guncelle_listesi = df_guncellenebilir_havuz.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_g_p = st.selectbox("İşlem Yapılacak Personeli Seçin", p_guncelle_listesi)
                 if secilen_g_p:
-                    # 🔒 190. SATIR PARÇALAMA HATASI KESİN OLARAK GİDERİLDİ
-                    g_sira_no = int(str(secilen_g_p).split("Sıra No: ")[1].split(" |")[0].strip())
+                    g_sira_no = int(str(secilen_g_p).split("Sıra No: ").split(" |").strip())
                     p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)].iloc[0]
                     varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                     varsayilan_cikis = str(p_satir["İşten Çıkış Tarihi"]) if str(p_satir["İşten Çıkış Tarihi"]) != "-" else ""
                     varsayilan_sira = g_sira_no
+                    varsayilan_fark = str(p_satir["Çıkış Gün Sayısı"]) if str(p_satir["Çıkış Gün Sayısı"]) != "-" else ""
             
             with st.form("excel_birebir_form", clear_on_submit=True):
                 f_sub1, f_sub2 = st.columns(2)
@@ -216,17 +216,9 @@ else:
                     p_calisma = st.selectbox("ÇALIŞMA DURUMU", ["NORMAL", "EMEKLİ"])
                 p_firma = st.text_input("FİRMA BİLGİSİ", value="USTA KONUT")
                 
-                hesaplanan_gun_metni = "-"
-                tarih_hata_kontrol = False
-                if p_ise_giris and p_isten_cikis != "-":
-                    try:
-                        g_tarih = datetime.datetime.strptime(p_ise_giris, "%d.%m.%Y")
-                        c_tarih = datetime.datetime.strptime(p_isten_cikis, "%d.%m.%Y")
-                        if g_tarih > c_tarih: tarih_hata_kontrol = True
-                        else: hesaplanan_gun_metni = f"{(c_tarih - g_tarih).days + 1} Gün"
-                    except: hesaplanan_gun_metni = "-"
-                
-                st.text_input("ÇIKIŞ GÜN SAYISI (Otomatik)", value=hesaplanan_gun_metni, disabled=True, key="c_gun_otomatik_gosterge")
+                # 🎯 NET ÇÖZÜM: Kilit kaldırıldı! Çıkış gün sayısı artık şefin klavyeden elle özgürce doldurabileceği bir kutu!
+                p_fark_gun_elle = st.text_input("ÇIKIŞ GÜN SAYISI", value=varsayilan_fark, placeholder="Örn: 15 Gün veya 26")
+                if p_fark_gun_elle.strip() == "": p_fark_gun_elle = "-"
                 
                 if st.form_submit_button("💾 VERİYİ OTOMATİK VERİTABANINA İŞLE", use_container_width=True):
                     if p_adi.strip() != "" and p_tc.strip() != "":
@@ -243,7 +235,7 @@ else:
                         
                         cursor.execute("""
                             INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), p_firma.strip().upper(), str(p_durum), str(p_calisma), str(hesaplanan_gun_metni)))
+                        """, (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), p_firma.strip().upper(), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
                         conn.commit()
                         conn.close()
                         
@@ -257,7 +249,7 @@ else:
                 p_silme_listesi_sube = df_goster.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
                 if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
-                    s_sira = int(str(secilen_sil_p_sube).split("Sıra No: ")[1].split(" |")[0].strip())
+                    s_sira = int(str(secilen_sil_p_sube).split("Sıra No: ").split(" |").strip())
                     conn = sqlite3.connect(DB_YOLU)
                     cursor = conn.cursor()
                     cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
@@ -327,6 +319,7 @@ else:
             
         with tab3:
             if not df_canli.empty: st.bar_chart(df_canli["Şantiye Bilgisi"].value_counts())
+
 
 
 
