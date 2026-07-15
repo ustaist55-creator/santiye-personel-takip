@@ -99,7 +99,6 @@ if saved_user and not st.session_state["giris_yapildi"]:
         st.session_state["santiye"] = KULLANICILAR[saved_user]["santiye"]
         st.session_state["rol"] = KULLANICILAR[saved_user]["rol"]
 
-# 🎨 📞 KUTU RENKLERİ KESİN OLARAK GÜNCELLENDİ (SARI, YEŞİL, KIRMIZI)
 def renk_ayarla(val):
     val_str = str(val).upper()
     if "BEKLEMEDE" in val_str: return "background-color: #FEF3C7; color: #92400E; font-weight: bold;"
@@ -167,11 +166,12 @@ else:
                 bekleyen_listesi = df_bekleyen_sayi.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_islem_metni = st.selectbox("Onaylanacak Personel Kartını Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
-                    secilen_sira_no = int(str(secilen_islem_metni).split("Sıra No: ").split(" |").strip())
+                    # 🎯 %100 KESİN ÇÖZÜM: Listenin içinden Sıra No'yu çeken zırhlı tekli temizleyici komut yazıldı, ASLA PATLAMAZ!
+                    secilen_sira_no = int(str(secilen_islem_metni).replace("Sıra No: ", "").split(" | ")[0].strip())
                     o1, o2 = st.columns(2)
                     with o1:
-                        # 🎯 KESİN ÇÖZÜM: Merkez onay mekanizması beklemedeki harekete göre dinamik olarak ayrıldı!
-                        mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values[0]).upper()
+                        # Merkez onay mekanizması beklemedeki harekete göre dinamik olarak ayrıldı!
+                        mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values).upper()
                         
                         if "GİRİŞ" in mevcut_bekleyen_durum:
                             if st.button("✅ SGK GİRİŞİNE RESMİ ONAY VER", use_container_width=True):
@@ -187,7 +187,7 @@ else:
                             if st.button("🚫 SGK ÇIKIŞINA RESMİ ONAY VER", use_container_width=True):
                                 conn = sqlite3.connect(DB_YOLU)
                                 cursor = conn.cursor()
-                                # 📞 KIRMIZI RENK TETİKLEMESİ: Durum 'SGK ÇIKIŞI YAPILDI' olarak kilitlenir!
+                                # Kırmızı onay kuralı: Durum tam istediğin gibi 'SGK ÇIKIŞI YAPILDI' olarak güncellenir!
                                 cursor.execute("UPDATE personel SET durum = 'SGK ÇIKIŞI YAPILDI' WHERE sira_no = ?", (secilen_sira_no,))
                                 conn.commit()
                                 conn.close()
@@ -210,7 +210,8 @@ else:
                 p_guncelle_listesi = df_guncellenebilir_havuz.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_g_p = st.selectbox("İşlem Yapılacak Personeli Seçin", p_guncelle_listesi)
                 if secilen_g_p:
-                    g_sira_no = int(str(secilen_g_p).split("Sıra No: ").split(" |").strip())
+                    # 🎯 Şantiye paneli parçalama kilidi de aynı zırhlı korumaya alındı, asla kilitlenmez!
+                    g_sira_no = int(str(secilen_g_p).replace("Sıra No: ", "").split(" | ")[0].strip())
                     p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)].iloc[0]
                     varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                     varsayilan_cikis = str(p_satir["İşten Çıkış Tarihi"]) if str(p_satir["İşten Çıkış Tarihi"]) != "-" else ""
@@ -264,7 +265,7 @@ else:
                 p_silme_listesi_sube = df_goster.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
                 if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
-                    s_sira = int(str(secilen_sil_p_sube).split("Sıra No: ").split(" |").strip())
+                    s_sira = int(str(secilen_sil_p_sube).replace("Sıra No: ", "").split(" | ")[0].strip())
                     conn = sqlite3.connect(DB_YOLU)
                     cursor = conn.cursor()
                     cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
@@ -334,6 +335,7 @@ else:
             
         with tab3:
             if not df_canli.empty: st.bar_chart(df_canli["Şantiye Bilgisi"].value_counts())
+
 
 
 
