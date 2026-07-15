@@ -5,7 +5,6 @@ import os
 import io
 import time
 import extra_streamlit_components as stx
-from streamlit_gsheets import GSheetsConnection
 
 # Sayfa Ayarları - Birebir Kurumsal Geniş Ekran
 st.set_page_config(page_title="PERSONEL TAKİP", layout="wide")
@@ -41,14 +40,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 📡 ORTAK VE GERÇEK GOOGLE DRIVE BAĞLANTISI
-conn = st.connection("gsheets", type=GSheetsConnection)
-
+# 📡 DOĞRUDAN GOOGLE SPREADSHEET OKUMA MOTORU (KÜTÜPHANESİZ HIZLI MODEL)
 def verileri_yukle():
     try:
-        st.cache_data.clear() # Her yenilemede en taze veriyi çeker
-        df_p = conn.read(worksheet="Sayfa1", ttl=0).dropna(how="all")
-        df_pt = conn.read(worksheet="Sayfa2", ttl=0).dropna(how="all")
+        url = "https://google.com"
+        csv_url_sayfa1 = f"{url}/export?format=csv&gid=0"
+        csv_url_sayfa2 = f"{url}/export?format=csv&gid=1864551121"
+        
+        df_p = pd.read_csv(csv_url_sayfa1).dropna(how="all")
+        df_pt = pd.read_csv(csv_url_sayfa2).dropna(how="all")
         return df_p, df_pt
     except:
         df_p = pd.DataFrame(columns=["Sıra No", "Adı Soyadı", "TC Kimlik No", "Doğum Tarihi", "İşe Giriş Tarihi", "İşten Çıkış Tarihi", "Birimi", "Şantiye Bilgisi", "Firma Bilgisi", "Giriş/Çıkış Durumu", "Çalışma Durumu", "Çıkış Gün Sayısı"])
@@ -57,24 +57,17 @@ def verileri_yukle():
 
 df_canli, df_puantaj_canli = verileri_yukle()
 
-# 🚀 ASLA KİLİTLENMEYEN TEK SATIR EKLEME (APPEND) MOTORU
-def google_drive_tek_satir_ekle(worksheet_adi, yeni_satir_df):
+# 🚀 ASLA KİLİTLENMEYEN GÜVENLİ PANDAS YAZMA KÖPRÜSÜ
+def google_drive_guncelle_kesin(worksheet_adi, yeni_df):
     try:
-        mevcut_df = conn.read(worksheet=worksheet_adi, ttl=0).dropna(how="all")
-        guncel_df = pd.concat([mevcut_df, yeni_satir_df]).astype(str).replace("nan", "-").replace("None", "-")
-        conn.update(worksheet=worksheet_adi, data=guncel_df)
+        temiz_df = yeni_df.astype(str).replace("nan", "-").replace("None", "-")
+        # Eski hatalı nesneyi ezip kurumsal yapıyla sisteme kilitler
+        st.connection("gsheets").update(worksheet=worksheet_adi, data=temiz_df)
         st.cache_data.clear()
         return True
     except:
-        # Arka arkaya 2. güvenli kanal denemesiyle kilidi kırar
-        try:
-            time.sleep(1)
-            conn.update(worksheet=worksheet_adi, data=guncel_df)
-            st.cache_data.clear()
-            return True
-        except:
-            st.error("⚠️ Google Drive bağlantısı kurulamadı, lütfen butona tekrar basın.")
-            return False
+        st.error("⚠️ Google Drive bağlantısı yenileniyor, lütfen butona bir kez daha basın.")
+        return False
 KULLANICILAR = {
     "istanbul": {"sifre": "5151", "santiye": "İSTANBUL", "rol": "sube"},
     "giresun": {"sifre": "5252", "santiye": "GİRESUN", "rol": "sube"},
@@ -183,10 +176,10 @@ else:
                     with o1:
                         if st.button("✅ HAREKETİ GOOGLE DRIVE'DA ONAYLA", use_container_width=True):
                             df_canli.loc[df_canli["Sıra No"].astype(str) == str(secilen_sira_no), "Giriş/Çıkış Durumu"] = "SGK GİRİŞİ YAPILDI"
-                            conn.update(worksheet="Sayfa1", data=df_canli)
-                            st.cache_data.clear()
-                            st.success("İşlem Google Drive'da kalıcı onaylandı!")
-                            st.rerun()
+                            if google_drive_guncelle_kesin("Sayfa1", df_canli):
+                                st.success("İşlem Google Drive'da onaylandı!")
+                                time.sleep(1)
+                                st.rerun()
                     with o2: st.info("Siz onay verdiğiniz an tüm şantiye ekranları anında ortak güncellenir.")
                 st.markdown("---")
 
@@ -247,11 +240,12 @@ else:
                             "Sıra No": int(sira_no), "Adı Soyadı": p_adi.strip().upper(), "TC Kimlik No": str(p_tc.strip()),
                             "Doğum Tarihi": str(p_dogum), "İşe Giriş Tarihi": str(p_ise_giris), "İşten Çıkış Tarihi": str(p_isten_cikis),
                             "Birimi": str(p_birim), "Şantiye Bilgisi": str(st.session_state["santiye"]), "Firma Bilgisi": p_firma.strip().upper(),
-                            "Giriş/Çıkış Durumu": str(p_durum), "Çalışma Durumu": str(p_calisma), "Çıkış Gün Sayısı": str(hesaplanan_gun_metni)
+                            "Giriş/Ç/kış Durumu": str(p_durum), "Çalışma Durumu": str(p_calisma), "Çıkış Gün Sayısı": str(hesaplanan_gun_metni)
                         }])
+                        df_canli = pd.concat([df_canli, yeni_personel_row]).sort_values(by="Sıra No")
                         
-                        if google_drive_tek_satir_ekle("Sayfa1", yeni_personel_row):
-                            st.success("✔️ Google Excel'e kalıcı olarak işlendi ve form temizlendi!")
+                        if google_drive_guncelle_kesin("Sayfa1", df_canli):
+                            st.success("✔️ Google Excel'e başarıyla işlendi ve form temizlendi!")
                             time.sleep(1)
                             st.rerun()
                     else: st.error("❌ İsim ve TC boş geçilemez!")
@@ -282,7 +276,8 @@ else:
                             "Tarih_Saat": su_an_p, "Şantiye": str(st.session_state["santiye"]), "Personel_Adi": str(p_ad_parca), "TC_Kimlik": str(p_tc_parca),
                             "Dönem_Ay": str(donem_ay), "Çalışılan_Gün_Sayısı": int(calisilan_gun), "Giren_Sef": sefi_adi.upper()
                         }])
-                        if google_drive_tek_satir_ekle("Sayfa2", yeni_puantaj_row):
+                        df_puantaj_canli = pd.concat([df_puantaj_canli, yeni_puantaj_row])
+                        if google_drive_guncelle_kesin("Sayfa2", df_puantaj_canli):
                             st.success("✔️ Puantaj kalıcı olarak e-tabloza eklendi!")
                             time.sleep(1)
                             st.rerun()
@@ -301,10 +296,10 @@ else:
             
         with tab2:
             st.dataframe(df_puantaj_canli.iloc[::-1] if not df_puantaj_canli.empty else df_puantaj_canli, use_container_width=True, hide_index=True)
-            st.download_button(label="📥 MASTER PUANTAJ RAPORU İNDİR", data=kurumsal_rapor_uret(df_puantaj_canli), file_name="master_puantaj.csv", mime="text/csv", use_container_width=True)
             
         with tab3:
             if not df_canli.empty: st.bar_chart(df_canli["Şantiye Bilgisi"].value_counts())
+
 
 
 
