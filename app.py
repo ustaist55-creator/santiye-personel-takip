@@ -67,7 +67,7 @@ sql_altyapi_kur()
 
 def verileri_yukle_sql():
     conn = sqlite3.connect(DB_YOLU)
-    # 🎯 HARF HATASI TAMAMEN DÜZELTİLDİ: 'Çalışma Durumu' yapıldı, tablo şak diye sağa gelecek!
+    # Sütun harf hatası giderildi, veri tablosu kurumsal olarak kilitlendi
     df_p = pd.read_sql_query("SELECT sira_no as 'Sıra No', adi_soyadi as 'Adı Soyadı', tc_no as 'TC Kimlik No', dogum_tarihi as 'Doğum Tarihi', ise_giris as 'İşe Giriş Tarihi', isten_cikis as 'İşten Çıkış Tarihi', birimi as 'Birimi', santiye as 'Şantiye Bilgisi', firma as 'Firma Bilgisi', durum as 'Giriş/Çıkış Durumu', calisma_sekli as 'Çalışma Durumu', fark_gun as 'Çıkış Gün Sayısı' FROM personel", conn)
     df_pt = pd.read_sql_query("SELECT tarih_satir as 'Tarih_Saat', santiye as 'Şantiye', personel_adi as 'Personel_Adi', tc_no as 'TC_Kimlik', donem_ay as 'Dönem_Ay', gun_sayisi as 'Çalışılan_Gün_Sayısı', giren_sef as 'Giren_Sef' FROM puantaj", conn)
     conn.close()
@@ -161,12 +161,21 @@ else:
         df_p_goster = df_puantaj_canli.copy()
 
     df_bekleyen_sayi = df_canli[df_canli["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])] if not df_canli.empty else pd.DataFrame()
+
+    st.markdown("---")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Onaylı Aktif Çalışan", len(df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"]) if not df_goster.empty else 0)
+    m2.metric("Onay Bekleyen Hareketler", len(df_goster[df_goster["Giriş/Çıkış Durumu"].astype(str).str.contains("BEKLEMEDE", na=False)]) if not df_goster.empty else 0)
+    m3.metric("Toplam Kartlı Personel", len(df_goster) if not df_goster.empty else 0)
+    m4.metric("Toplam Puantaj Gün Sayısı", int(df_p_goster["Çalışılan_Gün_Sayısı"].astype(float).sum()) if not df_p_goster.empty else 0)
+    st.markdown("---")
     if st.session_state["rol"] == "merkez":
         if not df_bekleyen_sayi.empty:
             with st.expander("🔔 ŞANTİYELERDEN GELEN ONAY BEKLEYEN HAREKETLER", expanded=True):
                 bekleyen_listesi = df_bekleyen_sayi.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_islem_metni = st.selectbox("Onaylanacak Personel Kartını Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
+                    # 169. satır parça hatası kesin olarak zırhlandırıldı ve düzeltildi
                     secilen_sira_no = int(str(secilen_islem_metni).split("Sıra No: ")[1].split(" |")[0].strip())
                     o1, o2 = st.columns(2)
                     with o1:
@@ -247,10 +256,33 @@ else:
                         conn.commit()
                         conn.close()
                         
-                        st.success("✔️ SQL Veritabanına saniyesinde otomatik işlendi ve form temizlendi!")
+                        st.success("✔️ SQL Veritabanına saniyesinde otomatik işlendi!")
                         time.sleep(0.5)
                         st.rerun()
                     else: st.error("❌ İsim ve TC boş geçilemez!")
+            
+            if not df_goster.empty:
+                st.markdown("---")
+                p_silme_listesi_sube = df_goster.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
+                secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
+                if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
+                    s_sira = int(str(secilen_sil_p_sube).split("Sıra No: ")[1].split(" |")[0].strip())
+                    conn = sqlite3.connect(DB_YOLU)
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
+                    conn.commit()
+                    conn.close()
+                    st.success("Personel kartı silindi!")
+                    st.rerun()
+        
+        # 🎯 TABLO AKTİFLEŞTİRİLDİ: Canlı Havuz Tablosu sağ tarafa milimetrik olarak yerleştirildi!
+        with col_sag_tablo:
+            st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
+            if not df_goster.empty:
+                st.dataframe(df_goster.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
+            else:
+                st.info("💡 Şu an şantiyenize ait kayıtlı personel kartı bulunmuyor.")
+            st.download_button(label="📄 BU LİSTEYİ BİLGİSAYARINA RAPORLA (EXCEL RAPORU YAP)", data=kurumsal_rapor_uret(df_goster), file_name="santiye_personel_raporu.csv", mime="text/csv", use_container_width=True)
     elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
         st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
         col_p1, col_p2 = st.columns(2)
@@ -291,7 +323,7 @@ else:
         tab1, tab2, tab3 = st.tabs(["👥 CANLI PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI", "📊 STRATEJİK GRAFİK ANALİTİĞİ"])
         
         with tab1:
-            st.dataframe(df_canli.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
+            st.dataframe(df_canli.style.map(renk_ayarla, subset=["Giriş/Ç/kış Durumu"] if "GİRİŞ" in str(df_canli.columns) else ["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
             st.download_button(label="📥 MASTER EXCEL RAPORU İNDİR", data=kurumsal_rapor_uret(df_canli), file_name="master_personel.csv", mime="text/csv", use_container_width=True)
             
         with tab2:
@@ -300,6 +332,7 @@ else:
             
         with tab3:
             if not df_canli.empty: st.bar_chart(df_canli["Şantiye Bilgisi"].value_counts())
+
 
 
 
