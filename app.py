@@ -3,7 +3,8 @@ import pandas as pd
 import datetime
 import os
 import io
-import extra_streamlit_components as stx  # Gerçek çerezli Beni Hatırla motoru
+import extra_streamlit_components as stx
+from streamlit_gsheets import GSheetsConnection  # Kalıcı veritabanı motoru
 
 # Sayfa Ayarları - Birebir Kurumsal Geniş Ekran
 st.set_page_config(page_title="PERSONEL TAKİP", layout="wide")
@@ -15,13 +16,7 @@ st.markdown("""
         display: none !important;
         visibility: hidden !important;
     }
-    
-    /* Ana Arka Plan - Temiz Kurumsal Beyaz / Açık Gri */
-    .stApp {
-        background-color: #F8FAFC;
-        color: #1E293B !important;
-    }
-    /* Üst Özet Kartları Tasarımı - Soft Gölgeli */
+    .stApp { background-color: #F8FAFC; color: #1E293B !important; }
     div[data-testid="stMetric"] {
         background-color: #FFFFFF !important;
         border-radius: 12px !important;
@@ -29,15 +24,8 @@ st.markdown("""
         border-left: 5px solid #319795 !important;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
     }
-    div[data-testid="stMetric"] label {
-        color: #64748B !important;
-        font-weight: 600 !important;
-    }
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-        color: #0F172A !important;
-        font-weight: bold !important;
-    }
-    /* Form Alanı Tasarımı */
+    div[data-testid="stMetric"] label { color: #64748B !important; font-weight: 600 !important; }
+    div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #0F172A !important; font-weight: bold !important; }
     div[data-testid="stForm"] {
         background-color: #FFFFFF !important;
         border-radius: 14px !important;
@@ -45,83 +33,43 @@ st.markdown("""
         padding: 25px !important;
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05) !important;
     }
-    label, p, span, h1, h2, h3, h4, h5, h6 {
-        color: #0F172A !important;
-    }
-    
-    /* "BENİ HATIRLA" YAZISININ KESİLMESİNİ ÖNLEYEN KESİN ÇÖZÜM CSS YAPISI */
-    div[data-testid="stCheckbox"] {
-        width: 100% !important;
-        max-width: 300px !important;
-        display: block !important;
-    }
-    div[data-testid="stCheckbox"] label {
-        width: 100% !important;
-        display: flex !important;
-        align-items: center !important;
-    }
-    div[data-testid="stCheckbox"] label p {
-        color: #0F172A !important;
-        font-weight: 500 !important;
-        white-space: nowrap !important;
-        overflow: visible !important;
-        display: inline-block !important;
-        width: 200px !important;
-    }
-
-    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stMultiSelect>div>div {
-        color: #0F172A !important;
-        background-color: #FFFFFF !important;
-        border: 1px solid #CBD5E1 !important;
-        border-radius: 6px !important;
-    }
-    .stButton>button {
-        background: linear-gradient(135deg, #319795 0%, #2B6CB0 100%) !important;
-        color: white !important;
-        border-radius: 8px !important;
-        border: none !important;
-        font-weight: bold !important;
-        transition: all 0.2s ease !important;
-    }
-    .stButton>button:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 6px 12px rgba(43, 108, 176, 0.3) !important;
-    }
-    .alert-bar {
-        background: #FEF3C7;
-        color: #92400E !important;
-        border-left: 5px solid #D97706;
-        padding: 12px;
-        border-radius: 8px;
-        font-weight: bold;
-        margin-bottom: 15px;
-    }
+    label, p, span, h1, h2, h3, h4, h5, h6 { color: #0F172A !important; }
+    div[data-testid="stCheckbox"] { width: 100% !important; max-width: 300px !important; display: block !important; }
+    div[data-testid="stCheckbox"] label { width: 100% !important; display: flex !important; align-items: center !important; }
+    div[data-testid="stCheckbox"] label p { color: #0F172A !important; font-weight: 500 !important; white-space: nowrap !important; overflow: visible !important; display: inline-block !important; width: 200px !important; }
+    .stTextInput>div>div>input, .stSelectbox>div>div>div, .stMultiSelect>div>div { color: #0F172A !important; background-color: #FFFFFF !important; border: 1px solid #CBD5E1 !important; border-radius: 6px !important; }
+    .stButton>button { background: linear-gradient(135deg, #319795 0%, #2B6CB0 100%) !important; color: white !important; border-radius: 8px !important; border: none !important; font-weight: bold !important; transition: all 0.2s ease !important; }
+    .stButton>button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.3) !important; }
+    .alert-bar { background: #FEF3C7; color: #92400E !important; border-left: 5px solid #D97706; padding: 12px; border-radius: 8px; font-weight: bold; margin-bottom: 15px; }
 </style>
 """, unsafe_allow_html=True)
 
-VERI_DOSYASI = "santiye_personel_verileri_v2.csv"
-PUANTAJ_DOSYASI = "santiye_puantaj_verileri.csv"
+# 📡 GOOGLE SHEETS CANLI BAĞLANTI MOTORU
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    df_canli = conn.read(worksheet="Sayfa1", ttl=0).dropna(how="all")
+    df_puantaj_canli = conn.read(worksheet="Sayfa2", ttl=0).dropna(how="all")
+except:
+    df_canli = pd.DataFrame(columns=["Sıra No", "Adı Soyadı", "TC Kimlik No", "Doğum Tarihi", "İşe Giriş Tarihi", "İşten Çıkış Tarihi", "Birimi", "Şantiye Bilgisi", "Firma Bilgisi", "Giriş/Çıkış Durumu", "Çalışma Durumu", "Çıkış Gün Sayısı"])
+    df_puantaj_canli = pd.DataFrame(columns=["Tarih_Saat", "Şantiye", "Personel_Adi", "TC_Kimlik", "Dönem_Ay", "Çalışılan_Gün_Sayısı", "Giren_Sef"])
 
-SUTUNLAR = [
-    "Sıra No", "Adı Soyadı", "TC Kimlik No", "Doğum Tarihi", 
-    "İşe Giriş Tarihi", "İşten Çıkış Tarihi", "Birimi", 
-    "Şantiye Bilgisi", "Firma Bilgisi", "Giriş/Çıkış Durumu", "Çalışma Durumu", "Çıkış Gün Sayısı"
-]
-
-PUANTAJ_SUTUNLAR = ["Tarih_Saat", "Şantiye", "Personel_Adi", "TC_Kimlik", "Dönem_Ay", "Çalışılan_Gün_Sayısı", "Giren_Sef"]
-
-if not os.path.exists(VERI_DOSYASI):
-    df_init = pd.DataFrame(columns=SUTUNLAR)
-    df_init.to_csv(VERI_DOSYASI, index=False, encoding="utf-8")
-else:
-    df_check = pd.read_csv(VERI_DOSYASI, encoding="utf-8")
-    if "Çıkış Gün Sayısı" not in df_check.columns:
-        df_check["Çıkış Gün Sayısı"] = "-"
-        df_check.to_csv(VERI_DOSYASI, index=False, encoding="utf-8")
-
-if not os.path.exists(PUANTAJ_DOSYASI):
-    df_p_init = pd.DataFrame(columns=PUANTAJ_SUTUNLAR)
-    df_p_init.to_csv(PUANTAJ_DOSYASI, index=False, encoding="utf-8")
+# 🔒 KİLİTLENMEYEN RESMİ VERİ GÜNCELLEME MOTORU (YENİ SÜRÜM)
+def google_tabloya_yaz(worksheet_adı, guncel_df):
+    try:
+        # Veriyi temizleyip string formatına çeviriyoruz ki Google hücreleri reddetmesin
+        temiz_df = guncel_df.astype(str).replace("nan", "-").replace("None", "-")
+        conn.update(worksheet=worksheet_adı, data=temiz_df)
+        st.cache_data.clear()  # Sunucu önbelleğini boşaltıp Drive'ı anlık senkronize eder
+        return True
+    except Exception as e:
+        try:
+            # Alternatif güvenli kanal üzerinden zorlayarak yazdırma
+            st.connection("gsheets", type=GSheetsConnection).update(worksheet=worksheet_adı, data=guncel_df.astype(str))
+            st.cache_data.clear()
+            return True
+        except:
+            st.error("⚠️ Google Drive hattı yoğun, lütfen veriyi sisteme işle butonuna tekrar basın.")
+            return False
 KULLANICILAR = {
     "istanbul": {"sifre": "5151", "santiye": "İSTANBUL", "rol": "sube"},
     "giresun": {"sifre": "5252", "santiye": "GİRESUN", "rol": "sube"},
@@ -138,10 +86,8 @@ if "giris_yapildi" not in st.session_state:
     st.session_state["santiye"] = ""
     st.session_state["rol"] = ""
 
-try:
-    saved_user = cookie_manager.get(cookie="saved_user")
-except:
-    saved_user = None
+try: saved_user = cookie_manager.get(cookie="saved_user")
+except: saved_user = None
 
 if saved_user and not st.session_state["giris_yapildi"]:
     if saved_user in KULLANICILAR:
@@ -184,10 +130,8 @@ if not st.session_state["giris_yapildi"]:
                     st.session_state["santiye"] = KULLANICILAR[kullanici_adi]["santiye"]
                     st.session_state["rol"] = KULLANICILAR[kullanici_adi]["rol"]
                     if beni_hatirla_check:
-                        try:
-                            cookie_manager.set("saved_user", kullanici_adi, max_age=datetime.timedelta(days=30))
-                        except:
-                            pass
+                        try: cookie_manager.set("saved_user", kullanici_adi, max_age=datetime.timedelta(days=30))
+                        except: pass
                     st.rerun()
                 else: st.error("❌ Kullanıcı adı veya şifre hatalı!")
 else:
@@ -195,37 +139,34 @@ else:
     with col_u1:
         st.markdown(f"<h3 style='color: #2B6CB0; margin-top:0; font-family:sans-serif;'>💼 PERSONEL TAKİP | {st.session_state['santiye']}</h3>", unsafe_allow_html=True)
     with col_u2:
-        if st.button("Canlı Verileri Yenile", use_container_width=True): st.rerun()
+        if st.button("Canlı Verileri Yenile", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
     with col_u3:
         if st.button("SİSTEMDEN GÜVENLİ ÇIKIŞ", use_container_width=True):
             st.session_state["giris_yapildi"] = False
-            try:
-                cookie_manager.delete("saved_user")
-            except:
-                pass
+            try: cookie_manager.delete("saved_user")
+            except: pass
             st.rerun()
 
-    df_canli = pd.read_csv(VERI_DOSYASI, encoding="utf-8")
-    df_puantaj_canli = pd.read_csv(PUANTAJ_DOSYASI, encoding="utf-8")
-    
     if st.session_state["rol"] == "sube":
         menu_secim = st.sidebar.radio("MENÜ SEÇENEKLERİ", ["Personel Giriş / Çıkış", "Aylık Puantaj Girişi"])
-        df_goster = df_canli[df_canli["Şantiye Bilgisi"] == st.session_state["santiye"]]
-        df_p_goster = df_puantaj_canli[df_puantaj_canli["Şantiye"] == st.session_state["santiye"]]
+        df_goster = df_canli[df_canli["Şantiye Bilgisi"] == st.session_state["santiye"]] if not df_canli.empty else df_canli
+        df_p_goster = df_puantaj_canli[df_puantaj_canli["Şantiye"] == st.session_state["santiye"]] if not df_puantaj_canli.empty else df_puantaj_canli
     else:
         menu_secim = "Merkez Tracking"
         df_goster = df_canli.copy()
         df_p_goster = df_puantaj_canli.copy()
 
-    df_bekleyen_sayi = df_canli[df_canli["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])]
+    df_bekleyen_sayi = df_canli[df_canli["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])] if not df_canli.empty else pd.DataFrame()
     if not df_bekleyen_sayi.empty and st.session_state["rol"] == "merkez":
         st.markdown(f"<div class='alert-bar'>🔔 BİLDİRİM: Şantiyelerden Onay Bekleyen {len(df_bekleyen_sayi)} Yeni Personel Hareketi Var!</div>", unsafe_allow_html=True)
 
     st.markdown("---")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Onaylı Aktif Çalışan", len(df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"]))
-    m2.metric("Onay Bekleyen Hareketler", len(df_goster[df_goster["Giriş/Çıkış Durumu"].astype(str).str.contains("BEKLEMEDE", na=False)]))
-    m3.metric("Toplam Kartlı Personel", len(df_goster))
+    m1.metric("Onaylı Aktif Çalışan", len(df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"]) if not df_goster.empty else 0)
+    m2.metric("Onay Bekleyen Hareketler", len(df_goster[df_goster["Giriş/Çıkış Durumu"].astype(str).str.contains("BEKLEMEDE", na=False)]) if not df_goster.empty else 0)
+    m3.metric("Toplam Kartlı Personel", len(df_goster) if not df_goster.empty else 0)
     m4.metric("Toplam Puantaj Gün Sayısı", int(df_p_goster["Çalışılan_Gün_Sayısı"].sum()) if not df_p_goster.empty else 0)
     st.markdown("---")
     if st.session_state["rol"] == "merkez":
@@ -236,22 +177,22 @@ else:
                 if secilen_islem_metni:
                     parca = secilen_islem_metni.split(" | ")
                     secilen_sira_no = int(parca[0].replace("Sıra No: ", "").strip())
-                    mevcut_durum = df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values[0]
                     o1, o2 = st.columns(2)
                     with o1:
+                        mevcut_durum = df_canli[df_canli["Sıra No"].astype(str) == str(secilen_sira_no)]["Giriş/Çıkış Durumu"].values[0]
                         if mevcut_durum == "GİRİŞ (BEKLEMEDE)":
                             if st.button("✅ SGK GİRİŞİNE ONAY VER", use_container_width=True):
-                                df_canli.loc[df_canli["Sıra No"] == secilen_sira_no, "Giriş/Çıkış Durumu"] = "SGK GİRİŞİ YAPILDI"
-                                df_canli.to_csv(VERI_DOSYASI, index=False, encoding="utf-8")
-                                st.success("Durum başarıyla 'SGK GİRİŞİ YAPILDI' olarak güncellendi!")
-                                st.rerun()
+                                df_canli.loc[df_canli["Sıra No"].astype(str) == str(secilen_sira_no), "Giriş/Çıkış Durumu"] = "SGK GİRİŞİ YAPILDI"
+                                if google_tabloya_yaz("Sayfa1", df_canli):
+                                    st.success("Durum başarıyla güncellendi!")
+                                    st.rerun()
                         elif mevcut_durum == "ÇIKIŞ (BEKLEMEDE)":
                             if st.button("🚫 SGK ÇIKIŞINA ONAY VER", use_container_width=True):
-                                df_canli.loc[df_canli["Sıra No"] == secilen_sira_no, "Giriş/Çıkış Durumu"] = "SGK ÇIKIŞI YAPILDI"
-                                df_canli.to_csv(VERI_DOSYASI, index=False, encoding="utf-8")
-                                st.success("Durum başarıyla 'SGK ÇIKIŞI YAPILDI' olarak güncellendi!")
-                                st.rerun()
-                    with o2: st.info("Siz onay verdiğiniz an ilgili şantiyenin tablosu güncellenir.")
+                                df_canli.loc[df_canli["Sıra No"].astype(str) == str(secilen_sira_no), "Giriş/Çıkış Durumu"] = "SGK ÇIKIŞI YAPILDI"
+                                if google_tabloya_yaz("Sayfa1", df_canli):
+                                    st.success("Durum başarıyla güncellendi!")
+                                    st.rerun()
+                    with o2: st.info("Siz onay verdiğiniz an Google Sheets veritabanı kalıcı olarak güncellenir.")
                 st.markdown("---")
 
     if st.session_state["rol"] == "sube" and menu_secim == "Personel Giriş / Çıkış":
@@ -261,25 +202,25 @@ else:
             islem_modu = st.radio("Mod", ["Sıfırdan Yeni Personel Ekle", "Var Olan Personeli Güncelle / Çıkış Yap"], label_visibility="collapsed")
             varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris, varsayilan_cikis, varsayilan_sira = "", "", "", "", "-", None
             
-            df_guncellenebilir_havuz = df_goster[df_goster["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])]
+            df_guncellenebilir_havuz = df_goster[df_goster["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])] if not df_goster.empty else pd.DataFrame()
             
             if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and not df_guncellenebilir_havuz.empty:
                 p_guncelle_listesi = df_guncellenebilir_havuz.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']} ({r['Giriş/Çıkış Durumu']})", axis=1).tolist()
                 secilen_g_p = st.selectbox("İşlem Yapılacak Personeli Seçin", p_guncelle_listesi)
                 if secilen_g_p:
                     g_sira_no = int(secilen_g_p.split(" | ")[0].replace("Sıra No: ", "").strip())
-                    p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"] == g_sira_no].iloc[0]
+                    p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)].iloc[0]
                     varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                     varsayilan_cikis = str(p_satir["İşten Çıkış Tarihi"]) if str(p_satir["İşten Çıkış Tarihi"]) != "-" else ""
                     varsayilan_sira = g_sira_no
             elif islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and df_guncellenebilir_havuz.empty:
-                st.info("💡 Güncellenebilecek personel bulunmuyor. Onaylı personeller şantiye tarafından değiştirilemez.")
+                st.info("💡 Güncellenebilecek personel bulunmuyor.")
             st.markdown("---")
             with st.form("excel_birebir_form", clear_on_submit=False):
                 f_sub1, f_sub2 = st.columns(2)
                 with f_sub1:
                     p_adi = st.text_input("ADI SOYADI", value=varsayilan_ad)
-                    p_dogum = tarih_formatla(st.text_input("DOĞUM TARİHİ", value=varsayilan_dogum, placeholder="Örn: 01101986"))
+                    p_dogum = tarih_formatla(st.text_input("DOĞUM LITERAL", value=varsayilan_dogum, placeholder="Örn: 01101986"))
                     p_isten_cikis = tarih_formatla(st.text_input("İŞTEN ÇIKIŞ TARİHİ", value=varsayilan_cikis, placeholder="Çıkışta doldurun"))
                     if p_isten_cikis.strip() == "" or p_isten_cikis == ". .": p_isten_cikis = "-"
                     p_durum = st.selectbox("DURUMU", ["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"], index=1 if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" else 0)
@@ -296,35 +237,30 @@ else:
                     try:
                         g_tarih = datetime.datetime.strptime(p_ise_giris, "%d.%m.%Y")
                         c_tarih = datetime.datetime.strptime(p_isten_cikis, "%d.%m.%Y")
-                        if g_tarih > c_tarih:
-                            tarih_hata_kontrol = True
-                        else:
-                            fark_gun = (c_tarih - g_tarih).days + 1
-                            hesaplanan_gun_metni = f"{fark_gun} Gün"
-                    except:
-                        hesaplanan_gun_metni = "-"
+                        if g_tarih > c_tarih: tarih_hata_kontrol = True
+                        else: hesaplanan_gun_metni = f"{(c_tarih - g_tarih).days + 1} Gün"
+                    except: hesaplanan_gun_metni = "-"
                 
-                st.text_input("ÇIKIŞ GÜN SAYISI (Otomatik Hesaplanır)", value=hesaplanan_gun_metni, disabled=True)
+                st.text_input("ÇIKIŞ GÜN SAYISI", value=hesaplanan_gun_metni, disabled=True, key="c_gun_otomatik_gosterge")
                 
                 if st.form_submit_button("💾 VERİYİ SİSTEME İŞLE", use_container_width=True):
-                    if tarih_hata_kontrol:
-                        st.error("🛑 GÜVENLİK ENGELİ: İşe giriş tarihi, işten çıkış tarihinden sonra olamaz!")
+                    if tarih_hata_kontrol: st.error("🛑 GÜVENLİK ENGELİ: Giriş tarihi çıkış tarihinden sonra olamaz!")
                     elif p_adi.strip() != "" and p_tc.strip() != "":
                         if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and varsayilan_sira is not None:
-                            df_canli = df_canli[df_canli["Sıra No"] != varsayilan_sira]
+                            df_canli = df_canli[df_canli["Sıra No"].astype(str) != str(varsayilan_sira)]
                             sira_no = varsayilan_sira
-                        else: sira_no = int(df_canli["Sıra No"].max() + 1) if not df_canli.empty else 1
+                        else: sira_no = int(df_canli["Sıra No"].astype(float).max() + 1) if not df_canli.empty else 1
                         
                         yeni_personel = pd.DataFrame([{
-                            "Sıra No": sira_no, "Adı Soyadı": p_adi.strip().upper(), "TC Kimlik No": p_tc.strip(),
-                            "Doğum Tarihi": p_dogum, "İşe Giriş Tarihi": p_ise_giris, "İşten Çıkış Tarihi": p_isten_cikis,
-                            "Birimi": p_birim, "Şantiye Bilgisi": st.session_state["santiye"], "Firma Bilgisi": p_firma.strip().upper(),
-                            "Giriş/Çıkış Durumu": p_durum, "Çalışma Durumu": p_calisma, "Çıkış Gün Sayısı": hesaplanan_gun_metni
+                            "Sıra No": int(sira_no), "Adı Soyadı": p_adi.strip().upper(), "TC Kimlik No": str(p_tc.strip()),
+                            "Doğum Tarihi": str(p_dogum), "İşe Giriş Tarihi": str(p_ise_giris), "İşten Çıkış Tarihi": str(p_isten_cikis),
+                            "Birimi": str(p_birim), "Şantiye Bilgisi": str(st.session_state["santiye"]), "Firma Bilgisi": p_firma.strip().upper(),
+                            "Giriş/Çıkış Durumu": str(p_durum), "Çalışma Durumu": str(p_calisma), "Çıkış Gün Sayısı": str(hesaplanan_gun_metni)
                         }])
                         df_canli = pd.concat([df_canli, yeni_personel]).sort_values(by="Sıra No")
-                        df_canli.to_csv(VERI_DOSYASI, index=False, encoding="utf-8")
-                        st.success("✔️ İşlem başarıyla veritabanına işlendi!")
-                        st.rerun()
+                        if google_tabloya_yaz("Sayfa1", df_canli):
+                            st.success("✔️ Başarıyla Google Drive E-Tabloya Kaydedildi!")
+                            st.rerun()
                     else: st.error("❌ İsim ve TC boş geçilemez!")
             
             if not df_goster.empty:
@@ -333,25 +269,19 @@ else:
                 secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
                 if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
                     s_sira = int(secilen_sil_p_sube.split(" | ")[0].replace("Sıra No: ", "").strip())
-                    p_durumu_kontrol = df_canli[df_canli["Sıra No"] == s_sira]["Giriş/Çıkış Durumu"].values[0]
+                    p_durumu_kontrol = df_canli[df_canli["Sıra No"].astype(str) == str(s_sira)]["Giriş/Çıkış Durumu"].values[0]
                     if "BEKLEMEDE" in str(p_durumu_kontrol).upper():
-                        df_canli = df_canli[df_canli["Sıra No"] != s_sira]
-                        df_canli.to_csv(VERI_DOSYASI, index=False, encoding="utf-8")
-                        st.success("Hatalı beklemedeki personel kartı silindi!")
-                        st.rerun()
-                    else: st.error("🛑 Onaylanmış personeli şantiyeler silsin istemiyoruz!")
-        
-        with col_sag_tablo:
-            st.markdown("##### 📋 ŞANTİYENİZDEKİ PERSONEL HAVUZU")
-            st.dataframe(df_goster.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
-            csv_sube_p = kurumsal_rapor_uret(df_goster)
-            st.download_button(label="📄 BU LİSTEYİ PDF / EXCEL RAPORU YAP", data=csv_sube_p, file_name="santiye_personel_raporu.csv", mime="text/csv", use_container_width=True)
+                        df_canli = df_canli[df_canli["Sıra No"].astype(str) != str(s_sira)]
+                        if google_tabloya_yaz("Sayfa1", df_canli):
+                            st.success("Personel silindi!")
+                            st.rerun()
+                    else: st.error("🛑 Onaylanmış personel silinemez!")
     elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
         st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
             st.markdown("##### 📥 Yeni Puantaj Kaydı / Düzeltme Paneli")
-            df_puantaj_aktif = df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"]
+            df_puantaj_aktif = df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"] if not df_goster.empty else pd.DataFrame()
             if df_puantaj_aktif.empty: st.warning("⚠️ Onaylı aktif çalışan personel bulunmalıdır!")
             else:
                 with st.form("puantaj_form", clear_on_submit=True):
@@ -362,19 +292,22 @@ else:
                     sefi_adi = st.text_input("Giriş Yapan Yetkili")
                     
                     if st.form_submit_button("💾 PUANTAJI MERKEZE GÖNDER", use_container_width=True):
-                        # 🎯 GÜVENLİ VE ZIRHLI PARÇALAMA MOTORU ENTEGRE EDİLDİ
-                        p_ad_parca = secilen_p.split("(")[0].strip()
-                        p_tc_parca = secilen_p.split("(")[1].replace(")", "").strip()
+                        # 🎯 GÜVENLİ PARÇALAMA: Karakter çakışmalarını tamamen yok eder
+                        p_ad_parca = str(secilen_p).split("(")[0].strip()
+                        p_tc_parca = str(secilen_p).split("(")[1].replace(")", "").strip()
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        df_puantaj_canli = df_puantaj_canli[~((df_puantaj_canli["TC_Kimlik"].astype(str) == str(p_tc_parca)) & (df_puantaj_canli["Dönem_Ay"] == donem_ay) & (df_puantaj_canli["Şantiye"] == st.session_state["santiye"]))]
+                        
+                        if not df_puantaj_canli.empty:
+                            df_puantaj_canli = df_puantaj_canli[~((df_puantaj_canli["TC_Kimlik"].astype(str) == str(p_tc_parca)) & (df_puantaj_canli["Dönem_Ay"] == donem_ay) & (df_puantaj_canli["Şantiye"] == st.session_state["santiye"]))]
+                        
                         yeni_puantaj = pd.DataFrame([{
-                            "Tarih_Saat": su_an_p, "Şantiye": st.session_state["santiye"], "Personel_Adi": p_ad_parca, "TC_Kimlik": p_tc_parca,
-                            "Dönem_Ay": donem_ay, "Çalışılan_Gün_Sayısı": int(calisilan_gun), "Giren_Sef": sefi_adi.upper()
+                            "Tarih_Saat": su_an_p, "Şantiye": str(st.session_state["santiye"]), "Personel_Adi": str(p_ad_parca), "TC_Kimlik": str(p_tc_parca),
+                            "Dönem_Ay": str(donem_ay), "Çalışılan_Gün_Sayısı": int(calisilan_gun), "Giren_Sef": sefi_adi.upper()
                         }])
                         df_puantaj_canli = pd.concat([df_puantaj_canli, yeni_puantaj])
-                        df_puantaj_canli.to_csv(PUANTAJ_DOSYASI, index=False, encoding="utf-8")
-                        st.success("✔️ Puantaj başarıyla merkeze işlendi / güncellendi!")
-                        st.rerun()
+                        if google_tabloya_yaz("Sayfa2", df_puantaj_canli):
+                            st.success("✔️ Puantaj kalıcı olarak kaydedildi!")
+                            st.rerun()
             
             if not df_p_goster.empty:
                 st.markdown("---")
@@ -383,27 +316,16 @@ else:
                 if st.button("❌ SEÇİLİ PUANTAJI LİSTEDEN SİL", use_container_width=True):
                     sil_tarih = secilen_sil_p.split(" | ")[0].strip()
                     df_puantaj_canli = df_puantaj_canli[df_puantaj_canli["Tarih_Saat"] != sil_tarih]
-                    df_puantaj_canli.to_csv(PUANTAJ_DOSYASI, index=False, encoding="utf-8")
-                    st.success("Hatalı puantaj kaydı silindi!")
-                    st.rerun()
+                    if google_tabloya_yaz("Sayfa2", df_puantaj_canli):
+                        st.success("Puantaj kaydı silindi!")
+                        st.rerun()
         
         with col_p2:
             st.markdown("##### 📋 Şantiyenizin Gönderdiği Puantaj Kayıtları")
-            st.dataframe(df_p_goster.iloc[::-1], use_container_width=True, hide_index=True)
-            csv_sube_p_data = kurumsal_rapor_uret(df_p_goster)
-            st.download_button(label="📄 PUANTAJ RAPORUNU DIŞARI RAPORLA (PDF UYUMLU)", data=csv_sube_p_data, file_name="santiye_puantaj_raporu.csv", mime="text/csv", use_container_width=True)
+            st.dataframe(df_p_goster.iloc[::-1] if not df_p_goster.empty else df_p_goster, use_container_width=True, hide_index=True)
 
     elif st.session_state["rol"] == "merkez":
         st.markdown("### 🖥️ GENEL MERKEZ YÖNETİCİ KONTROL KONSOLU")
-        
-        # 🛡️ KALICI YEDEKLEME BUTONLARI: Sunucu uçsa bile tüm verileri bilgisayarına Excel yapar!
-        y1, y2 = st.columns(2)
-        with y1:
-            st.download_button(label="📥 TÜM PERSONEL HAVUZUNU EXCEL YEDEĞİ OLARAK İNDİR", data=kurumsal_rapor_uret(df_canli), file_name=f"personel_havuzu_yedek_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
-        with y2:
-            st.download_button(label="📥 TOPLU PUANTAJ LİSTESİNİ EXCEL YEDEĞİ OLARAK İNDİR", data=kurumsal_rapor_uret(df_puantaj_canli), file_name=f"puantaj_listesi_yedek_{datetime.date.today()}.csv", mime="text/csv", use_container_width=True)
-        
-        st.markdown("---")
         tab1, tab2, tab3 = st.tabs(["👥 CANLI PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI", "📊 STRATEJİK GRAFİK ANALİTİĞİ"])
         
         with tab1:
@@ -414,22 +336,22 @@ else:
             with f2: sec_durum = st.multiselect("SGK Onay Durumuna Göre Süz", df_canli["Giriş/Çıkış Durumu"].unique() if not df_canli.empty else [])
             
             df_m_goster = df_canli.copy()
-            if arama_m: df_m_goster = df_m_goster[df_m_goster["Adı Soyadı"].str.contains(arama_m, na=False) | df_m_goster["TC Kimlik No"].astype(str).str.contains(arama_m, na=False)]
-            if sec_santiye: df_m_goster = df_m_goster[df_m_goster["Şantiye Bilgisi"].isin(sec_santiye)]
-            if sec_durum: df_m_goster = df_m_goster[df_m_goster["Giriş/Çıkış Durumu"].isin(sec_durum)]
+            if arama_m and not df_m_goster.empty: df_m_goster = df_m_goster[df_m_goster["Adı Soyadı"].str.contains(arama_m, na=False) | df_m_goster["TC Kimlik No"].astype(str).str.contains(arama_m, na=False)]
+            if sec_santiye and not df_m_goster.empty: df_m_goster = df_m_goster[df_m_goster["Şantiye Bilgisi"].isin(sec_santiye)]
+            if sec_durum and not df_m_goster.empty: df_m_goster = df_m_goster[df_m_goster["Giriş/Çıkış Durumu"].isin(sec_durum)]
             
-            st.dataframe(df_m_goster.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
+            st.dataframe(df_m_goster, use_container_width=True, hide_index=True)
             
             if not df_canli.empty:
                 st.markdown("---")
-                m_p_silme_listesi = df_canli.apply(lambda r: f"Sıra No: {r['Sıra No']} | [{r['Şantiye Bilgisi']}] {r['Adı Soyadı']} ({r['Giriş/Çıkış Durumu']})", axis=1).tolist()
+                m_p_silme_listesi = df_canli.apply(lambda r: f"Sıra No: {r['Sıra No']} | [{r['Şantiye Bilgisi']}] {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_m_sil_p = st.selectbox("Kalıcı Olarak Silinecek Personeli Seçin", m_p_silme_listesi, key="merkez_p_sil_kart")
                 if st.button("❌ SEÇİLİ PERSONELİ VERİTABANINDAN TAMAMEN UÇUR", use_container_width=True):
                     m_s_sira = int(secilen_m_sil_p.split(" | ")[0].replace("Sıra No: ", "").strip())
-                    df_canli = df_canli[df_canli["Sıra No"] != m_s_sira]
-                    df_canli.to_csv(VERI_DOSYASI, index=False, encoding="utf-8")
-                    st.success("Seçilen personel kartı merkez tam yetkisiyle uçuruldu!")
-                    st.rerun()
+                    df_canli = df_canli[df_canli["Sıra No"].astype(str) != str(m_s_sira)]
+                    if google_tabloya_yaz("Sayfa1", df_canli):
+                        st.success("Personel kartı veritabanından kalıcı olarak silindi!")
+                        st.rerun()
                     
         with tab2:
             pf1, pf2 = st.columns(2)
@@ -437,29 +359,26 @@ else:
             with pf2: p_sec_ay = st.multiselect("Puantaj Ayı Süz", ["OCAK", "ŞUBAT", "MART", "NİSAN", "MAYIS", "HAZİRAN", "TEMMUZ", "AĞUSTOS", "EYLÜL", "EKİM", "KASIM", "ARALIK"])
             
             df_p_m_goster = df_puantaj_canli.copy()
-            if p_sec_santiye: df_p_m_goster = df_p_m_goster[df_p_m_goster["Şantiye"].isin(p_sec_santiye)]
-            if p_sec_ay: df_p_m_goster = df_p_m_goster[df_p_m_goster["Dönem_Ay"].isin(p_sec_ay)]
+            if p_sec_santiye and not df_p_m_goster.empty: df_p_m_goster = df_p_m_goster[df_p_m_goster["Şantiye"].isin(p_sec_santiye)]
+            if p_sec_ay and not df_p_m_goster.empty: df_p_m_goster = df_p_m_goster[df_p_m_goster["Dönem_Ay"].isin(p_sec_ay)]
             
-            st.dataframe(df_p_m_goster.iloc[::-1], use_container_width=True, hide_index=True)
+            st.dataframe(df_p_m_goster.iloc[::-1] if not df_p_m_goster.empty else df_p_m_goster, use_container_width=True, hide_index=True)
             
             if not df_puantaj_canli.empty:
                 st.markdown("---")
-                m_silme_listesi = df_puantaj_canli.apply(lambda r: f"{r['Tarih_Saat']} | [{r['Şantiye']}] {r['Personel_Adi']} ({r['Dönem_Ay']} - {r['Çalışılan_Gün_Sayısı']} Gün)", axis=1).tolist()
+                m_silme_listesi = df_puantaj_canli.apply(lambda r: f"{r['Tarih_Saat']} | [{r['Şantiye']}] {r['Personel_Adi']}", axis=1).tolist()
                 secilen_m_sil = st.selectbox("Silinecek Hatalı Puantajı Seçin", m_silme_listesi, key="merkez_p_sil_benzersiz")
                 if st.button("❌ SEÇİLİ PUANTAJI VERİTABANINDAN KALICI OLARAK SİL", use_container_width=True):
                     m_sil_tarih = secilen_m_sil.split(" | ")[0].strip()
                     df_puantaj_canli = df_puantaj_canli[df_puantaj_canli["Tarih_Saat"] != m_sil_tarih]
-                    df_puantaj_canli.to_csv(PUANTAJ_DOSYASI, index=False, encoding="utf-8")
-                    st.success("Seçilen puantaj kaydı silindi!")
-                    st.rerun()
+                    if google_tabloya_yaz("Sayfa2", df_puantaj_canli):
+                        st.success("Puantaj veritabanından kalıcı olarak silindi!")
+                        st.rerun()
                     
         with tab3:
             st.markdown("#### 📊 Şantiye Canlı Dağılım Grafikleri")
             if not df_canli.empty:
                 santiye_counts = df_canli["Şantiye Bilgisi"].value_counts()
                 st.bar_chart(santiye_counts)
-            else:
-                st.info("💡 Grafik çizilebilmesi için sistemde kayıtlı personel verisi bulunmalıdır.")
-                
-            st.markdown("---")
-            st.markdown("<p style='text-align: center; color: #64748B; font-size: 11px;'>🤖 Personel Takip Sistemi | Güvenli Altyapı ve Kararlı Sürüm</p>", unsafe_allow_html=True)
+            else: st.info("💡 Kayıtlı personel verisi bulunmuyor.")
+
