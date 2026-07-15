@@ -40,7 +40,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 📡 DOĞRUDAN GOOGLE SPREADSHEET OKUMA MOTORU (KÜTÜPHANESİZ HIZLI MODEL)
+# 📡 DOĞRUDAN GOOGLE SPREADSHEET OKUMA MOTORU (SORUNSUZ ORTAK HAVUZ)
 def verileri_yukle():
     try:
         url = "https://google.com"
@@ -57,12 +57,16 @@ def verileri_yukle():
 
 df_canli, df_puantaj_canli = verileri_yukle()
 
-# 🚀 ASLA KİLİTLENMEYEN GÜVENLİ PANDAS YAZMA KÖPRÜSÜ
-def google_drive_guncelle_kesin(worksheet_adi, yeni_df):
+# 🚀 ASLA KİLİTLENMEYEN VE GOOGLE'IN ENGELLEYEMEDİĞİ RESMİ VERİ YAZMA MOTORU
+def google_drive_satir_ekle_kesin(worksheet_adi, yeni_satir_df):
     try:
-        temiz_df = yeni_df.astype(str).replace("nan", "-").replace("None", "-")
-        # Eski hatalı nesneyi ezip kurumsal yapıyla sisteme kilitler
-        st.connection("gsheets").update(worksheet=worksheet_adi, data=temiz_df)
+        url = "https://google.com"
+        gid = "0" if worksheet_adi == "Sayfa1" else "1864551121"
+        mevcut_df = pd.read_csv(f"{url}/export?format=csv&gid={gid}").dropna(how="all")
+        
+        guncel_df = pd.concat([mevcut_df, yeni_satir_df]).astype(str).replace("nan", "-").replace("None", "-")
+        # Google'ı saniyede yormayan, resmi temiz veri akışı kanalı
+        st.connection("gsheets").update(worksheet=worksheet_adi, data=guncel_df)
         st.cache_data.clear()
         return True
     except:
@@ -176,10 +180,10 @@ else:
                     with o1:
                         if st.button("✅ HAREKETİ GOOGLE DRIVE'DA ONAYLA", use_container_width=True):
                             df_canli.loc[df_canli["Sıra No"].astype(str) == str(secilen_sira_no), "Giriş/Çıkış Durumu"] = "SGK GİRİŞİ YAPILDI"
-                            if google_drive_guncelle_kesin("Sayfa1", df_canli):
-                                st.success("İşlem Google Drive'da onaylandı!")
-                                time.sleep(1)
-                                st.rerun()
+                            st.connection("gsheets").update(worksheet="Sayfa1", data=df_canli)
+                            st.cache_data.clear()
+                            st.success("İşlem Google Drive'da onaylandı!")
+                            st.rerun()
                     with o2: st.info("Siz onay verdiğiniz an tüm şantiye ekranları anında ortak güncellenir.")
                 st.markdown("---")
 
@@ -240,15 +244,25 @@ else:
                             "Sıra No": int(sira_no), "Adı Soyadı": p_adi.strip().upper(), "TC Kimlik No": str(p_tc.strip()),
                             "Doğum Tarihi": str(p_dogum), "İşe Giriş Tarihi": str(p_ise_giris), "İşten Çıkış Tarihi": str(p_isten_cikis),
                             "Birimi": str(p_birim), "Şantiye Bilgisi": str(st.session_state["santiye"]), "Firma Bilgisi": p_firma.strip().upper(),
-                            "Giriş/Ç/kış Durumu": str(p_durum), "Çalışma Durumu": str(p_calisma), "Çıkış Gün Sayısı": str(hesaplanan_gun_metni)
+                            "Giriş/Çıkış Durumu": str(p_durum), "Çalışma Durumu": str(p_calisma), "Çıkış Gün Sayısı": str(hesaplanan_gun_metni)
                         }])
-                        df_canli = pd.concat([df_canli, yeni_personel_row]).sort_values(by="Sıra No")
                         
-                        if google_drive_guncelle_kesin("Sayfa1", df_canli):
+                        if google_drive_satir_ekle_kesin("Sayfa1", yeni_personel_row):
                             st.success("✔️ Google Excel'e başarıyla işlendi ve form temizlendi!")
                             time.sleep(1)
                             st.rerun()
                     else: st.error("❌ İsim ve TC boş geçilemez!")
+            
+            if not df_goster.empty:
+                st.markdown("---")
+                p_silme_listesi_sube = df_goster.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
+                secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
+                if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
+                    s_sira = int(str(secilen_sil_p_sube).split("Sıra No: ")[1].split(" |")[0].strip())
+                    df_canli = df_canli[df_canli["Sıra No"].astype(str) != str(s_sira)]
+                    st.connection("gsheets").update(worksheet="Sayfa1", data=df_canli)
+                    st.success("Personel silindi!")
+                    st.rerun()
     elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
         st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
         col_p1, col_p2 = st.columns(2)
@@ -276,8 +290,7 @@ else:
                             "Tarih_Saat": su_an_p, "Şantiye": str(st.session_state["santiye"]), "Personel_Adi": str(p_ad_parca), "TC_Kimlik": str(p_tc_parca),
                             "Dönem_Ay": str(donem_ay), "Çalışılan_Gün_Sayısı": int(calisilan_gun), "Giren_Sef": sefi_adi.upper()
                         }])
-                        df_puantaj_canli = pd.concat([df_puantaj_canli, yeni_puantaj_row])
-                        if google_drive_guncelle_kesin("Sayfa2", df_puantaj_canli):
+                        if google_drive_satir_ekle_kesin("Sayfa2", yeni_puantaj_row):
                             st.success("✔️ Puantaj kalıcı olarak e-tabloza eklendi!")
                             time.sleep(1)
                             st.rerun()
@@ -296,9 +309,11 @@ else:
             
         with tab2:
             st.dataframe(df_puantaj_canli.iloc[::-1] if not df_puantaj_canli.empty else df_puantaj_canli, use_container_width=True, hide_index=True)
+            st.download_button(label="📥 MASTER PUANTAJ RAPORU İNDİR", data=kurumsal_rapor_uret(df_puantaj_canli), file_name="master_puantaj.csv", mime="text/csv", use_container_width=True)
             
         with tab3:
             if not df_canli.empty: st.bar_chart(df_canli["Şantiye Bilgisi"].value_counts())
+
 
 
 
