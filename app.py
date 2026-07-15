@@ -166,7 +166,7 @@ else:
                 bekleyen_listesi = df_bekleyen_sayi.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_islem_metni = st.selectbox("Onaylanacak Personel Kartını Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
-                    secilen_sira_no = int(str(secilen_islem_metni).split("Sıra No: ").split(" |").strip())
+                    secilen_sira_no = int(str(secilen_islem_metni).split("Sıra No: ")[1].split(" |")[0].strip())
                     o1, o2 = st.columns(2)
                     with o1:
                         if st.button("✅ HAREKETİ SİSTEME ONAYLA", use_container_width=True):
@@ -188,14 +188,14 @@ else:
             islem_modu = st.radio("Mod", ["Sıfırdan Yeni Personel Ekle", "Var Olan Personeli Güncelle / Çıkış Yap"], label_visibility="collapsed")
             varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris, varsayilan_cikis, varsayilan_sira = "", "", "", "", "-", None
             
-            # Onaylanmış (SGK GİRİŞİ YAPILDI) personeller de çıkış/güncelleme havuzuna eklendi!
             df_guncellenebilir_havuz = df_goster[df_goster["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)", "SGK GİRİŞİ YAPILDI"])] if not df_goster.empty else pd.DataFrame()
             
             if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and not df_guncellenebilir_havuz.empty:
                 p_guncelle_listesi = df_guncellenebilir_havuz.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_g_p = st.selectbox("İşlem Yapılacak Personeli Seçin", p_guncelle_listesi)
                 if secilen_g_p:
-                    g_sira_no = int(str(secilen_g_p).split("Sıra No: ").split(" |").strip())
+                    # 🔒 190. SATIR PARÇALAMA HATASI KESİN OLARAK GİDERİLDİ
+                    g_sira_no = int(str(secilen_g_p).split("Sıra No: ")[1].split(" |")[0].strip())
                     p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)].iloc[0]
                     varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                     varsayilan_cikis = str(p_satir["İşten Çıkış Tarihi"]) if str(p_satir["İşten Çıkış Tarihi"]) != "-" else ""
@@ -257,7 +257,7 @@ else:
                 p_silme_listesi_sube = df_goster.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
                 if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
-                    s_sira = int(str(secilen_sil_p_sube).split("Sıra No: ").split(" |").strip())
+                    s_sira = int(str(secilen_sil_p_sube).split("Sıra No: ")[1].split(" |")[0].strip())
                     conn = sqlite3.connect(DB_YOLU)
                     cursor = conn.cursor()
                     cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
@@ -272,7 +272,6 @@ else:
                 st.dataframe(df_goster.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
             else: st.info("💡 Şu an şantiyenize ait kayıtlı personel kartı bulunmuyor.")
             
-            # Yan yana hem kurumsal Excel hem de saniyede temiz çıktı alabileceğiniz resmi PDF Baskı butonu aktifleştirildi!
             r_col1, r_col2 = st.columns(2)
             with r_col1:
                 st.download_button(label="📥 BU LİSTEYİ EXCEL RAPORU YAP", data=kurumsal_rapor_uret(df_goster), file_name="santiye_personel_raporu.csv", mime="text/csv", use_container_width=True)
@@ -328,6 +327,7 @@ else:
             
         with tab3:
             if not df_canli.empty: st.bar_chart(df_canli["Şantiye Bilgisi"].value_counts())
+
 
 
 
