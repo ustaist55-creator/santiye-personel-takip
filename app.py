@@ -138,16 +138,13 @@ def tarih_formatla(metin):
     elif len(temiz) >= 3: return f"{temiz[:2]}.{temiz[2:]}"
     return temiz
 
-# 🎯 NET ÇÖZÜM: Excel'de sütunların tek hücreye sıkışmasını engelleyen, noktalı virgüllü ve tam istediğin başlık sıralamasına sahip kurumsal rapor motoru!
 def kurumsal_rapor_uret(df_data):
     if df_data.empty: return "".encode('utf-8-sig')
-    # İstenen sütunları filtrele ve isimlerini güncelle
     df_excel = pd.DataFrame()
     df_excel["Adı Soyadı"] = df_data["Adı Soyadı"]
     df_excel["TC Kimlik No"] = df_data["TC Kimlik No"]
     df_excel["İşe Giriş Tarihi"] = df_data["İşe Giriş Tarihi"]
     df_excel["SGK Giriş Durumu"] = df_data["Giriş/Çıkış Durumu"]
-    # Excel'in Türkçe işletim sistemlerinde yan yana açması için sep=; komutu eklenmiştir
     csv_string = df_excel.to_csv(index=False, sep=';')
     return csv_string.encode('utf-8-sig')
 
@@ -245,9 +242,11 @@ else:
                 secilen_g_p = st.selectbox("Personel Seçin", p_guncelle_listesi)
                 if secilen_g_p:
                     g_sira_no = int(str(secilen_g_p).replace("Sıra No: ", "").split(" | ").strip())
-                    p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)].iloc
-                    varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
-                    varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir["Çıkış Gün Sayısı"])
+                    p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)]
+                    if not p_satir.empty:
+                        p_satir_data = p_satir.iloc
+                        varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir_data["Adı Soyadı"]), str(p_satir_data["TC Kimlik No"]), str(p_satir_data["Doğum Tarihi"]), str(p_satir_data["İşe Giriş Tarihi"])
+                        varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir_data["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir_data["Çıkış Gün Sayısı"])
             
             with st.form("excel_birebir_form", clear_on_submit=True):
                 f_sub1, f_sub2 = st.columns(2)
@@ -273,7 +272,11 @@ else:
                         else:
                             cursor.execute("SELECT MAX(sira_no) FROM personel")
                             row_val = cursor.fetchone()
-                            sira_no = int(row_val) + 1 if row_val and row_val is not None else 1
+                            # 🎯 %100 KESİN YAMA: row_val paketi (None,) veya bos dondugunde patlamayan zırhlı tam sayı filtrelemesi!
+                            if row_val and row_val != (None,) and row_val != None:
+                                sira_no = int(row_val) + 1
+                            else:
+                                sira_no = 1
                         
                         cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
                         conn.commit(); conn.close(); st.success("✔️ Başarıyla işlendi!"); time.sleep(0.5); st.rerun()
@@ -347,6 +350,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
+
 
 
 
