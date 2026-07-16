@@ -90,7 +90,6 @@ YENI_BIRIMLER = [
     "İSG UZMANI", "FORMEN", "BEDEN İŞÇİSİ", "DÜZ İŞÇİ", "YÖNETİCİ",
     "OFİS ELEMANI", "SEKRETER", "BÜRO MEMURU"
 ]
-# 🎯 YENİ GÜNCEL ŞANTİYE, FİRMA VE ŞİFRE MATRİSİ (BİREBİR TABLODAN İŞLENDİ)
 KULLANICILAR = {
     "canik": {"sifre": "5151", "santiye": "CANİK", "firma": "NEVZAT USTA", "rol": "sube"},
     "gaziethempaşa": {"sifre": "5252", "santiye": "GAZİETHEMPAŞA", "firma": "NEVZAT USTA", "rol": "sube"},
@@ -101,11 +100,9 @@ KULLANICILAR = {
     "istanbul": {"sifre": "5757", "santiye": "İSTANBUL", "firma": "USTA KONUT", "rol": "sube"},
     "morfoloji": {"sifre": "5858", "santiye": "MORFOLOJİ", "firma": "USTA KONUT", "rol": "sube"},
     "yayladere": {"sifre": "5959", "santiye": "YAYLADERE", "firma": "USTA KONUT", "rol": "sube"},
-    "merkezişyeri": {"sifre": "6060", "santiye": "MERKZE İŞYERİ-2", "firma": "USTA CONUT", "rol": "sube"},
+    "merkezişyeri": {"sifre": "6060", "santiye": "MERKZE İŞYERİ-2", "firma": "USTA KONUT", "rol": "sube"},
     "kılıçdede": {"sifre": "6161", "santiye": "KILIÇDEDE2", "firma": "USTA KONUT", "rol": "sube"},
-    # 🎯 ÖZEL NOT: Yönetici hesabı sadece izleme modunda, işlem yetkisi kapalı
     "yönetici": {"sifre": "5050", "santiye": "HEPSİ", "firma": "HEPSİ", "rol": "izleyici"},
-    # 🎯 ÖZEL NOT: Merkez hesabı tam yetkili şifresi 2944 yapıldı
     "merkez": {"sifre": "2944", "santiye": "HEPSİ", "firma": "HEPSİ", "rol": "merkez"}
 }
 
@@ -150,7 +147,7 @@ if not st.session_state["giris_yapildi"]:
     st.write("")
     col_l1, col_l2, col_l3 = st.columns([1.2, 1, 1.2])
     with col_l2:
-        st.markdown("<h3 style='text-align: center; color: #2B6CB0; margin-bottom: 5px;'>🏛 ... PERSONEL TAKİP</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; color: #2B6CB0; margin-bottom: 5px;'>🏛️ PERSONEL TAKİP</h3>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; color: #64748B; font-size:13px; margin-bottom:20px;'>Kullanıcı Giriş Paneli</p>", unsafe_allow_html=True)
         beni_hatirla_check = st.checkbox("Beni Hatırla")
         with st.form("login_form"):
@@ -186,7 +183,6 @@ else:
         df_goster = df_canli[df_canli["Şantiye Bilgisi"] == st.session_state["santiye"]] if not df_canli.empty else df_canli
         df_p_goster = df_puantaj_canli[df_puantaj_canli["Şantiye"] == st.session_state["santiye"]] if not df_puantaj_canli.empty else df_puantaj_canli
     else:
-        # Merkez ve Sadece İzleyici (Yönetici) tüm verileri görür
         menu_secim = st.sidebar.radio("MENÜ SEÇENEKLERİ", ["Merkez Tracking", "Aylık Puantajları İzle"])
         df_goster = df_canli.copy()
         df_p_goster = df_puantaj_canli.copy()
@@ -231,7 +227,7 @@ else:
                                 cursor.execute("UPDATE personel SET durum = 'SGK GİRİŞİ YAPILDI' WHERE sira_no = ?", (secilen_sira_no,))
                                 conn.commit()
                                 conn.close()
-                                st.success("Personel Girişi Onaylandı (YEŞİL)!")
+                                st.success("Personel Girişi Onaylandı!")
                                 time.sleep(0.5)
                                 st.rerun()
                         elif "ÇIKIŞ" in mevcut_bekleyen_durum:
@@ -241,7 +237,7 @@ else:
                                 cursor.execute("UPDATE personel SET durum = 'SGK ÇIKIŞI YAPILDI' WHERE sira_no = ?", (secilen_sira_no,))
                                 conn.commit()
                                 conn.close()
-                                st.success("Personel Çıkışı Onaylandı (KIRMIZI)!")
+                                st.success("Personel Çıkışı Onaylandı!")
                                 time.sleep(0.5)
                                 st.rerun()
                     with o2: st.info("Onay verildiği an personelin satırı kırmızıya veya yeşile döner.")
@@ -281,7 +277,6 @@ else:
                     p_birim = st.selectbox("BİRİMİ", YENI_BIRIMLER)
                     p_calisma = st.selectbox("ÇALIŞMA DURUMU", ["NORMAL", "EMEKLİ"])
                 
-                # 🎯 KİLİTLİ ALANLAR: Giriş yapan şantiyeye göre Firma ve Şantiye bilgisi otomatik basılır!
                 st.text_input("FİRMA BİLGİSİ", value=st.session_state["firma"], disabled=True)
                 p_fark_gun_elle = st.text_input("ÇIKIŞ GÜN SAYISI", value=varsayilan_fark, placeholder="Elle serbest doldurabilirsiniz")
                 if p_fark_gun_elle.strip() == "": p_fark_gun_elle = "-"
@@ -296,7 +291,8 @@ else:
                         else:
                             cursor.execute("SELECT MAX(sira_no) FROM personel")
                             row_val = cursor.fetchone()
-                            sira_no = int(row_val) + 1 if row_val and row_val is not None else 1
+                            # 🎯 %100 TYPEERROR YAMASI: SQLite paketini tuple dışına çıkarıp temiz rakam üreten resmi düzeltme yapıldı!
+                            sira_no = int(row_val[0]) + 1 if row_val and row_val[0] is not None else 1
                         
                         cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
                         conn.commit()
@@ -306,7 +302,6 @@ else:
                         st.rerun()
                     else: st.error("❌ İsim ve TC boş geçilemez!")
             
-            # Şantiyede onay alanların silinmesi engellendi kilidi
             df_sube_silinebilir = df_goster[df_goster["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])] if not df_goster.empty else pd.DataFrame()
             if not df_sube_silinebilir.empty:
                 st.markdown("---")
@@ -399,11 +394,11 @@ else:
             st.dataframe(df_merkez_p_filtreli.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
             st.download_button(label="📥 MASTER EXCEL RAPORU İNDİR", data=kurumsal_rapor_uret(df_merkez_p_filtreli), file_name="master_personel.csv", mime="text/csv", use_container_width=True)
             
-            # 🎯 GÜVENLİK YAMASI: Sadece MERKEZ silebilir; YÖNETİCİ (izleyici) hesabı silemez!
+            # Sadece MERKEZ silebilir; YÖNETİCİ (izleyici) hesabı silemez!
             if st.session_state["rol"] == "merkez" and not df_merkez_p_filtreli.empty:
                 st.markdown("---")
                 m_p_sil_list = df_merkez_p_filtreli.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']} ({r['Şantiye Bilgisi']})", axis=1).tolist()
-                m_secilen_sil = st.selectbox("MASTER SİLME: Veritabanından Tamamen Uçurulacak Personeli Seçin", m_p_sil_list, key="m_p_sil_box")
+                m_secilen_sil = st.selectbox("MASTER SİLME: Veritabanından Uçurulacak Personeli Seçin", m_p_sil_list, key="m_p_sil_box")
                 if st.button("🔥 SEÇİLİ PERSONELİ VERİTABANINA KALICI OLARAK SİL", use_container_width=True):
                     m_sil_sira = int(str(m_secilen_sil).replace("Sıra No: ", "").split(" | ").strip())
                     conn = sqlite3.connect(DB_YOLU)
@@ -411,7 +406,7 @@ else:
                     cursor.execute("DELETE FROM personel WHERE sira_no = ?", (m_sil_sira,))
                     conn.commit()
                     conn.close()
-                    st.success("Personel veritabanından ebediyen silindi!")
+                    st.success("Personel veritabanından silindi!")
                     time.sleep(0.5)
                     st.rerun()
             
@@ -428,21 +423,22 @@ else:
             st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
             st.download_button(label="📥 MASTER PUANTAJ RAPORU İNDİR", data=kurumsal_rapor_uret(df_merkez_pt_filtreli), file_name="master_puantaj.csv", mime="text/csv", use_container_width=True)
             
-            # GÜVENLİK YAMASI: Sadece MERKEZ puantaj silebilir; YÖNETİCİ (izleyici) hesabı silemez!
+            # Sadece MERKEZ puantaj silebilir; YÖNETİCİ (izleyici) hesabı silemez!
             if st.session_state["rol"] == "merkez" and not df_merkez_pt_filtreli.empty:
                 st.markdown("---")
                 m_pt_sil_list = df_merkez_pt_filtreli.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']} ({r['Şantiye']})", axis=1).tolist()
-                m_secilen_pt_sil = st.selectbox("MASTER SİLME: Veritabanından Tamamen Uçurulacak Puantajı Seçin", m_pt_sil_list, key="m_pt_sil_box")
-                if st.button("🔥 SEÇİLİ PUANTAJI VERİTABANINDAN KALICI OLARAK SİL", use_container_width=True):
+                m_secilen_pt_sil = st.selectbox("MASTER SİLME: Veritabanından Uçurulacak Puantajı Seçin", m_pt_sil_list, key="m_pt_sil_box")
+                if st.button("🔥 SEÇİLİ PUANTAJI VERİTABANINOAN KALICI OLARAK SİL", use_container_width=True):
                     m_sil_pt_id = int(str(m_secilen_pt_sil).replace("ID: ", "").split(" | ").strip())
                     conn = sqlite3.connect(DB_YOLU)
                     cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = ?", (m_sil_pt_id,))
                     conn.commit()
                     conn.close()
-                    st.success("Puantaj kaydı veritabanından ebediyen silindi!")
+                    st.success("Puantaj kaydı veritabanından silindi!")
                     time.sleep(0.5)
                     st.rerun()
+
 
 
 
