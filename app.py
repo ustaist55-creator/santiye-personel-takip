@@ -151,9 +151,9 @@ if not st.session_state["giris_yapildi"]:
                 if kullanici_adi in KULLANICILAR and KULLANICILAR[kullanici_adi]["sifre"] == sifre:
                     st.session_state["giris_yapildi"] = True
                     st.session_state["kullanici"] = kullanici_adi
-                    st.session_state["santiye"] = KULLANICILAR[kullanici_adi]["santiye"]
-                    st.session_state["firma"] = KULLANICILAR[kullanici_adi]["firma"]
-                    st.session_state["rol"] = KULLANICILAR[kullanici_adi]["rol"]
+                    st.session_state["santiye"] = KULLANICILAR[saved_user]["santiye"] if saved_user else KULLANICILAR[kullanici_adi]["santiye"]
+                    st.session_state["firma"] = KULLANICILAR[saved_user]["firma"] if saved_user else KULLANICILAR[kullanici_adi]["firma"]
+                    st.session_state["rol"] = KULLANICILAR[saved_user]["rol"] if saved_user else KULLANICILAR[kullanici_adi]["rol"]
                     if beni_hatirla_check:
                         try: cookie_manager.set("saved_user", kullanici_adi, max_age=datetime.timedelta(days=30))
                         except: pass
@@ -204,7 +204,7 @@ else:
                 bekleyen_listesi = df_bekleyen_sayi.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']} ({r['Şantiye Bilgisi']})", axis=1).tolist()
                 secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
-                    secilen_sira_no = int(str(secilen_islem_metni).replace("Sıra No: ", "").split(" | ")[0].strip())
+                    secilen_sira_no = int(str(secilen_islem_metni).replace("Sıra No: ", "").split(" | ").strip())
                     o1, o2 = st.columns(2)
                     with o1:
                         mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values).upper()
@@ -231,8 +231,8 @@ else:
                 p_guncelle_listesi = df_guncellenebilir_havuz.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_g_p = st.selectbox("Personel Seçin", p_guncelle_listesi)
                 if secilen_g_p:
-                    g_sira_no = int(str(secilen_g_p).replace("Sıra No: ", "").split(" | ")[0].strip())
-                    p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)].iloc[0]
+                    g_sira_no = int(str(secilen_g_p).replace("Sıra No: ", "").split(" | ").strip())
+                    p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)].iloc
                     varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                     varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir["Çıkış Gün Sayısı"])
             
@@ -260,20 +260,21 @@ else:
                         else:
                             cursor.execute("SELECT MAX(sira_no) FROM personel")
                             row_val = cursor.fetchone()
-                            # 🎯 %100 NET ÇÖZÜM: Gelen paket demet yapısından ayıklanır, hata ebediyen yok edilir!
-                            sira_no = int(row_val[0]) + 1 if row_val and row_val[0] is not None else 1
+                            sira_no = int(row_val) + 1 if row_val and row_val is not None and row_val != (None,) else 1
                         
                         cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
                         conn.commit(); conn.close(); st.success("✔️ Başarıyla işlendi!"); time.sleep(0.5); st.rerun()
         with col_sag_tablo:
             st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
-            if not df_goster.empty:
-                df_goster_sirali = df_goster.sort_values(by="Sıra No", ascending=True)
+            # 🎯 %100 NAMEERROR YAMASI: Tablo boş bile olsa NameError fırlatmayan zırhlı süzgeç kilitlendi!
+            df_goster_sirali = df_goster.sort_values(by="Sıra No", ascending=True) if not df_goster.empty else df_goster
+            if not df_goster_sirali.empty:
                 st.dataframe(df_goster_sirali.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
                 r_col1, r_col2 = st.columns(2)
                 with r_col1: st.download_button(label="📥 BU LİSTEYİ EXCEL RAPORU YAP", data=kurumsal_rapor_uret(df_goster_sirali), file_name="santiye_personel_raporu.csv", mime="text/csv", use_container_width=True)
                 with r_col2:
                     if st.button("🖨️ BU LİSTEYİ RESMİ PDF YAP / YAZDIR", use_container_width=True): st.markdown("<script>window.print();</script>", unsafe_allow_html=True)
+            else: st.info("💡 Kayıtlı personel bulunmuyor.")
 
     elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
         st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
@@ -289,8 +290,8 @@ else:
                     calisilan_gun = st.number_input("Çalışılan Gün Sayısı", min_value=0, max_value=31, value=26)
                     sefi_adi = st.text_input("Giriş Yapan Yetkili")
                     if st.form_submit_button("💾 PUANTAJI MERKEZE GÖNDER", use_container_width=True):
-                        p_ad_parca = str(secilen_p).split(" (")[0].strip()
-                        p_tc_parca = str(secilen_p).split(" (")[1].replace(")", "").strip()
+                        p_ad_parca = str(secilen_p).split(" (").strip()
+                        p_tc_parca = str(secilen_p).split(" (").replace(")", "").strip()
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                         cursor.execute("DELETE FROM puantaj WHERE tc_no = ? AND donem_ay = ? AND santiye = ?", (p_tc_parca, donem_ay, st.session_state["santiye"]))
@@ -302,7 +303,7 @@ else:
                 p_silme_listesi = df_p_goster.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']}", axis=1).tolist()
                 secilen_p_sil_id = st.selectbox("Hatalı Kaydı Seçin", p_silme_listesi)
                 if st.button("❌ SEÇİLİ PUANTAJI LİSTEDEN SİL", use_container_width=True):
-                    sil_id = int(str(secilen_p_sil_id).replace("ID: ", "").split(" | ")[0].strip())
+                    sil_id = int(str(secilen_p_sil_id).replace("ID: ", "").split(" | ").strip())
                     conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = ?", (sil_id,))
                     conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
@@ -322,7 +323,7 @@ else:
                 m_p_sil_list = df_merkez_p_filtreli.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 m_secilen_sil = st.selectbox("MASTER SİLME: Personel Seçin", m_p_sil_list)
                 if st.button("🔥 SEÇİLİ PERSONELİ VERİTABANINA KALICI OLARAK SİL", use_container_width=True):
-                    m_sil_sira = int(str(m_secilen_sil).replace("Sıra No: ", "").split(" | ")[0].strip())
+                    m_sil_sira = int(str(m_secilen_sil).replace("Sıra No: ", "").split(" | ").strip())
                     conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                     cursor.execute("DELETE FROM personel WHERE sira_no = ?", (m_sil_sira,))
                     conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
@@ -334,14 +335,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
-            if st.session_state["rol"] == "merkez" and not df_merkez_pt_filtreli.empty:
-                m_pt_sil_list = df_merkez_pt_filtreli.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']}", axis=1).tolist()
-                m_secilen_pt_sil = st.selectbox("MASTER SİLME: Puantaj Seçin", m_pt_sil_list)
-                if st.button("🔥 SEÇİLİ PUANTAJI VERİTABANINDAN KALICI OLARAK SİL", use_container_width=True):
-                    m_sil_pt_id = int(str(m_secilen_pt_sil).replace("ID: ", "").split(" | ")[0].strip())
-                    conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
-                    cursor.execute("DELETE FROM puantaj WHERE id = ?", (m_sil_pt_id,))
-                    conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
+
 
 
 
