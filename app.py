@@ -183,7 +183,8 @@ else:
         df_goster = df_canli[df_canli["Şantiye Bilgisi"] == st.session_state["santiye"]] if not df_canli.empty else df_canli
         df_p_goster = df_puantaj_canli[df_puantaj_canli["Şantiye"] == st.session_state["santiye"]] if not df_puantaj_canli.empty else df_puantaj_canli
     else:
-        menu_secim = st.sidebar.radio("MENÜ SEÇENEKLERİ", ["Merkez Tracking", "Aylık Puantajları İzle"])
+        # 🎯 RADİO BUTON YAZISI TÜRKÇELEŞTİRİLDİ: "Merkez Tracking" -> "🏛️ Merkez Personel Takip" yapıldı!
+        menu_secim = st.sidebar.radio("MENÜ SEÇENEKLERİ", ["🏛️ Merkez Personel Takip", "📅 Aylık Puantajları İzle"])
         df_goster = df_canli.copy()
         df_p_goster = df_puantaj_canli.copy()
 
@@ -216,7 +217,8 @@ else:
                 bekleyen_listesi = df_bekleyen_sayi.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']} ({r['Şantiye Bilgisi']})", axis=1).tolist()
                 secilen_islem_metni = st.selectbox("Onaylanacak Personel Kartını Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
-                    secilen_sira_no = int(str(secilen_islem_metni).replace("Sıra No: ", "").split(" | ").strip())
+                    # 🎯 %100 MERKEZ ARNDIRMA YAMASI: split parçalamasından sonra string paketi temiz olarak ayrılır, asla kilitlenmez!
+                    secilen_sira_no = int(str(secilen_islem_metni).replace("Sıra No: ", "").split(" | ")[0].strip())
                     o1, o2 = st.columns(2)
                     with o1:
                         mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values).upper()
@@ -256,7 +258,8 @@ else:
                 p_guncelle_listesi = df_guncellenebilir_havuz.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_g_p = st.selectbox("İşlem Yapılacak Personeli Seçin", p_guncelle_listesi)
                 if secilen_g_p:
-                    g_sira_no = int(str(secilen_g_p).replace("Sıra No: ", "").split(" | ").strip())
+                    # 🎯 %100 ŞANTİYE ARNDIRMA YAMASI: string paketi temiz olarak ayrılır, asla kilitlenmez!
+                    g_sira_no = int(str(secilen_g_p).replace("Sıra No: ", "").split(" | ")[0].strip())
                     p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)].iloc
                     varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                     varsayilan_cikis = str(p_satir["İşten Çıkış Tarihi"]) if str(p_satir["İşten Çıkış Tarihi"]) != "-" else ""
@@ -291,7 +294,6 @@ else:
                         else:
                             cursor.execute("SELECT MAX(sira_no) FROM personel")
                             row_val = cursor.fetchone()
-                            # 🎯 %100 TYPEERROR YAMASI: SQLite paketini tuple dışına çıkarıp temiz rakam üreten resmi düzeltme yapıldı!
                             sira_no = int(row_val[0]) + 1 if row_val and row_val[0] is not None else 1
                         
                         cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
@@ -308,7 +310,7 @@ else:
                 p_silme_listesi_sube = df_sube_silinebilir.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                 secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
                 if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
-                    s_sira = int(str(secilen_sil_p_sube).replace("Sıra No: ", "").split(" | ").strip())
+                    s_sira = int(str(secilen_sil_p_sube).replace("Sıra No: ", "").split(" | ")[0].strip())
                     conn = sqlite3.connect(DB_YOLU)
                     cursor = conn.cursor()
                     cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
@@ -394,19 +396,18 @@ else:
             st.dataframe(df_merkez_p_filtreli.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
             st.download_button(label="📥 MASTER EXCEL RAPORU İNDİR", data=kurumsal_rapor_uret(df_merkez_p_filtreli), file_name="master_personel.csv", mime="text/csv", use_container_width=True)
             
-            # Sadece MERKEZ silebilir; YÖNETİCİ (izleyici) hesabı silemez!
             if st.session_state["rol"] == "merkez" and not df_merkez_p_filtreli.empty:
                 st.markdown("---")
                 m_p_sil_list = df_merkez_p_filtreli.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']} ({r['Şantiye Bilgisi']})", axis=1).tolist()
-                m_secilen_sil = st.selectbox("MASTER SİLME: Veritabanından Uçurulacak Personeli Seçin", m_p_sil_list, key="m_p_sil_box")
+                m_secilen_sil = st.selectbox("MASTER SİLME: Veritabanından Tamamen Uçurulacak Personeli Seçin", m_p_sil_list, key="m_p_sil_box")
                 if st.button("🔥 SEÇİLİ PERSONELİ VERİTABANINA KALICI OLARAK SİL", use_container_width=True):
-                    m_sil_sira = int(str(m_secilen_sil).replace("Sıra No: ", "").split(" | ").strip())
+                    m_sil_sira = int(str(m_secilen_sil).replace("Sıra No: ", "").split(" | ")[0].strip())
                     conn = sqlite3.connect(DB_YOLU)
                     cursor = conn.cursor()
                     cursor.execute("DELETE FROM personel WHERE sira_no = ?", (m_sil_sira,))
                     conn.commit()
                     conn.close()
-                    st.success("Personel veritabanından silindi!")
+                    st.success("Personel veritabanından başarıyla silindi!")
                     time.sleep(0.5)
                     st.rerun()
             
@@ -423,13 +424,12 @@ else:
             st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
             st.download_button(label="📥 MASTER PUANTAJ RAPORU İNDİR", data=kurumsal_rapor_uret(df_merkez_pt_filtreli), file_name="master_puantaj.csv", mime="text/csv", use_container_width=True)
             
-            # Sadece MERKEZ puantaj silebilir; YÖNETİCİ (izleyici) hesabı silemez!
             if st.session_state["rol"] == "merkez" and not df_merkez_pt_filtreli.empty:
                 st.markdown("---")
                 m_pt_sil_list = df_merkez_pt_filtreli.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']} ({r['Şantiye']})", axis=1).tolist()
-                m_secilen_pt_sil = st.selectbox("MASTER SİLME: Veritabanından Uçurulacak Puantajı Seçin", m_pt_sil_list, key="m_pt_sil_box")
-                if st.button("🔥 SEÇİLİ PUANTAJI VERİTABANINOAN KALICI OLARAK SİL", use_container_width=True):
-                    m_sil_pt_id = int(str(m_secilen_pt_sil).replace("ID: ", "").split(" | ").strip())
+                m_secilen_pt_sil = st.selectbox("MASTER SİLME: Veritabanından Tamamen Uçurulacak Puantajı Seçin", m_pt_sil_list, key="m_pt_sil_box")
+                if st.button("🔥 SEÇİLİ PUANTAJI VERİTABANINDAN KALICI OLARAK SİL", use_container_width=True):
+                    m_sil_pt_id = int(str(m_secilen_pt_sil).replace("ID: ", "").split(" | ")[0].strip())
                     conn = sqlite3.connect(DB_YOLU)
                     cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = ?", (m_sil_pt_id,))
