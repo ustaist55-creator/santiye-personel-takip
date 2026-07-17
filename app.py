@@ -140,7 +140,7 @@ def tarih_formatla(metin):
     elif len(temiz) >= 3: return f"{temiz[:2]}.{temiz[2:]}"
     return temiz
 
-# 🎯 MADDE 2: 12 SÜTUNUN TAMAMINI PARÇALAMADAN YAN YANA AKTARAN KURUMSAL EXCEL MOTORU
+# 🎯 MADDE 2: 12 SÜTUNUN TAMAMINI PARÇALAMADAN YAN YANA AKTARAN EXCEL MOTORU
 def kurumsal_rapor_uret(df_data):
     if df_data.empty: return "".encode('utf-8-sig')
     df_excel = pd.DataFrame()
@@ -184,7 +184,6 @@ else:
         if st.button("Canlı Verileri Yenile", use_container_width=True): st.rerun()
     with col_u3:
         if st.button("SİSTEMDEN GÜVENLİ ÇIKIŞ", use_container_width=True):
-            # 🔒 SYNTAX HATASI ARNDIRILDI: Tek satırda noktalı virgülden sonra gelen try-except bloğu nizami alt alta satırlara bölündü!
             st.session_state["giris_yapildi"] = False
             try: cookie_manager.delete("saved_user")
             except: pass
@@ -223,8 +222,7 @@ else:
                 secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
                     secilen_sira_no = int(str(secilen_islem_metni).replace("Sıra No: ", "").split(" | ").strip())
-                    # 🎯 3. MADDE NOKTA ATIŞI: Merkez butonu doğrudan istediğin o resmi loginldap linkine mühürlendi!
-                    st.markdown(f'<a href="https://uyg.sgk.gov.tr/SigortaliTescil/amp/loginldap" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3);">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN (BİLDİRGE YAP)</div></a>', unsafe_allow_html=True)
+                    st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3);">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN</div></a>', unsafe_allow_html=True)
                     o1, o2 = st.columns(2)
                     with o1:
                         mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values).upper()
@@ -240,7 +238,6 @@ else:
                                 conn.commit(); conn.close(); st.success("Çıkış Onaylandı!"); time.sleep(0.5); st.rerun()
 
     if st.session_state["rol"] == "sube" and menu_secim == "Personel Giriş / Çıkış":
-        # 🎯 MADDE 1: Formu darlıktan kurtarıp boydan boya yayan esnek yatay düzen
         st.markdown("##### 📥 PERSONEL KART TANIMLAMA")
         islem_modu = st.radio("Mod", ["Sıfırdan Yeni Personel Ekle", "Var Olan Personeli Güncelle / Çıkış Yap"], label_visibility="collapsed", horizontal=True)
         varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris, varsayilan_cikis, varsayilan_sira, varsayilan_fark = "", "", "", "", "-", None, ""
@@ -253,9 +250,11 @@ else:
                 match_g_sira = re.search(r"Sıra No:\s*(\d+)", str(secilen_g_p))
                 if match_g_sira:
                     g_sira_no = int(match_g_sira.group(1))
-                    p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)].iloc
-                    varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
-                    varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir["Çıkış Gün Sayısı"])
+                    p_satir = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)]
+                    if not p_satir.empty:
+                        p_satir_data = p_satir.iloc
+                        varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir_data["Adı Soyadı"]), str(p_satir_data["TC Kimlik No"]), str(p_satir_data["Doğum Tarihi"]), str(p_satir_data["İşe Giriş Tarihi"])
+                        varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir_data["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir_data["Çıkış Gün Sayısı"])
         
         with st.form("excel_birebir_form", clear_on_submit=True):
             f_col1, f_col2, f_col3 = st.columns(3)
@@ -276,7 +275,7 @@ else:
             
             st.text_input("FİRMA BİLGİSİ", value=st.session_state["firma"], disabled=True)
             
-            if st.form_submit_button("💾 VERİYİ OTOMATİK VERİTABANINA İŞLE", use_container_width=True):
+            if st.form_submit_button("💾 VERIYE OTOMATİK VERİTABANINA İŞLE", use_container_width=True):
                 if p_adi.strip() != "" and p_tc.strip() != "":
                     conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                     if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and varsayilan_sira is not None:
@@ -285,14 +284,17 @@ else:
                     else:
                         cursor.execute("SELECT MAX(sira_no) FROM personel")
                         row_val = cursor.fetchone()
-                        sira_no = int(row_val) + 1 if row_val and row_val is not None else 1
+                        # 🎯 %100 KURŞUN GEÇİRMEZ SIRA NO YAMASI: (None,) demet tuzağı tamamen kırıldı, boşta 1'den başlar!
+                        if row_val and row_val[0] is not None:
+                            sira_no = int(row_val[0]) + 1
+                        else:
+                            sira_no = 1
                     
                     cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
                     conn.commit(); conn.close(); st.success("✔️ Başarıyla işlendi!"); time.sleep(0.5); st.rerun()
                 else: st.error("❌ İsim ve TC boş geçilemez!")
         
-        # 🎯 3. MADDE NOKTA ATIŞI: Şantiye paneli altındaki kıpkırmızı buton da doğrudan istediğin o resmi loginldap sayfasına bağlandı!
-        st.markdown(f'<a href="https://uyg.sgk.gov.tr/SigortaliTescil/amp/loginldap" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-top:10px;margin-bottom:20px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3); font-size:16px;">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN (BİLDİRGE YAP)</div></a>', unsafe_allow_html=True)
+        st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-top:10px;margin-bottom:20px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3); font-size:16px;">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN (BİLDİRGE YAP)</div></a>', unsafe_allow_html=True)
         st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
         df_goster_sirali = df_goster.sort_values(by="Sıra No", ascending=True) if not df_goster.empty else df_goster
         if not df_goster_sirali.empty:
