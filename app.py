@@ -8,7 +8,7 @@ import sqlite3
 import re
 import extra_streamlit_components as stx
 
-# Sayfa Ayarları - Ekrana Tam Sığma Yaması Kilitlendi
+# Sayfa Ayarları - %100 Tam Ekran ve Sola-Sağa Sıfır Boşluk Nizamı
 st.set_page_config(page_title="PERSONEL TAKİP", layout="wide")
 
 st.markdown("""
@@ -22,7 +22,7 @@ st.markdown("""
         display: none !important;
         visibility: hidden !important;
     }
-    /* 📺 EKRANA TAM BİR RESMİ EVRAK GİBİ SIĞDIRMA CSS ZIRHI */
+    /* 📺 MADDE 1: EKRANA TAM SIĞDIRMA VE GENİŞLİK CSS ZIRHI */
     .block-container {
         max-width: 100% !important;
         padding-left: 20px !important;
@@ -30,7 +30,7 @@ st.markdown("""
         padding-top: 15px !important;
         padding-bottom: 15px !important;
     }
-    /* 📱 MOBİL UYUM YAMASI */
+    /* 📱 TELEFON / MOBİL UYUM YAMASI */
     @media (max-width: 768px) {
         .stSidebar { min-width: 100% !important; max-width: 100% !important; }
         div[data-testid="stForm"] { padding: 15px !important; }
@@ -140,7 +140,7 @@ def tarih_formatla(metin):
     elif len(temiz) >= 3: return f"{temiz[:2]}.{temiz[2:]}"
     return temiz
 
-# 🎯 MADDE 2: 12 SÜTUNUN TAMAMINI PARÇALAMADAN YAN YANA AKTARAN EXCEL FORMATI
+# 🎯 MADDE 2: 12 SÜTUNUN TAMAMINI PARÇALAMADAN YAN YANA AKTARAN EXCEL MOTORU
 def kurumsal_rapor_uret(df_data):
     if df_data.empty: return "".encode('utf-8-sig')
     df_excel = pd.DataFrame()
@@ -184,7 +184,9 @@ else:
         if st.button("Canlı Verileri Yenile", use_container_width=True): st.rerun()
     with col_u3:
         if st.button("SİSTEMDEN GÜVENLİ ÇIKIŞ", use_container_width=True):
-            st.session_state["giris_yapildi"] = False; try: cookie_manager.delete("saved_user")
+            # 🎯 %100 RESMİ SYNTAX YAMASI: 187. satırdaki hatalı tek satır kodlaması düzeltildi, alt alta zırhlandı!
+            st.session_state["giris_yapildi"] = False
+            try: cookie_manager.delete("saved_user")
             except: pass
             st.rerun()
 
@@ -221,7 +223,6 @@ else:
                 secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
                     secilen_sira_no = int(str(secilen_islem_metni).replace("Sıra No: ", "").split(" | ").strip())
-                    # 🌐 ON ONAY ALANI: Merkez için SGK Butonu
                     st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3);">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN</div></a>', unsafe_allow_html=True)
                     o1, o2 = st.columns(2)
                     with o1:
@@ -238,7 +239,7 @@ else:
                                 conn.commit(); conn.close(); st.success("Çıkış Onaylandı!"); time.sleep(0.5); st.rerun()
 
     if st.session_state["rol"] == "sube" and menu_secim == "Personel Giriş / Çıkış":
-        # 🎯 MADDE 1: Geniş çarşaf nizam yatay sütun düzeni aktif edildi
+        # 🎯 MADDE 1: Formu darlıktan kurtarıp boydan boya yayan esnek yatay düzen
         st.markdown("##### 📥 PERSONEL KART TANIMLAMA")
         islem_modu = st.radio("Mod", ["Sıfırdan Yeni Personel Ekle", "Var Olan Personeli Güncelle / Çıkış Yap"], label_visibility="collapsed", horizontal=True)
         varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris, varsayilan_cikis, varsayilan_sira, varsayilan_fark = "", "", "", "", "-", None, ""
@@ -274,7 +275,7 @@ else:
             
             st.text_input("FİRMA BİLGİSİ", value=st.session_state["firma"], disabled=True)
             
-            if st.form_submit_button("💾 VERİYİMİ OTOMATİK VERİTABANINA İŞLE", use_container_width=True):
+            if st.form_submit_button("💾 VERİYİ OTOMATİK VERİTABANINA İŞLE", use_container_width=True):
                 if p_adi.strip() != "" and p_tc.strip() != "":
                     conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                     if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and varsayilan_sira is not None:
@@ -289,7 +290,7 @@ else:
                     conn.commit(); conn.close(); st.success("✔️ Başarıyla işlendi!"); time.sleep(0.5); st.rerun()
                 else: st.error("❌ İsim ve TC boş geçilemez!")
         
-        # 🎯 NOKTA ATIŞI REVIZE BUTONU: İşte aradığın SGK Butonu tam buraya, form kilidinin hemen altına kıpkırmızı çakıldı!
+        # 🎯 MADDE 3: İşte aradığın kurumsal kıpkırmızı dev SGK butonu tam form kilidinin altında!
         st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-top:10px;margin-bottom:20px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3); font-size:16px;">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN (BİLDİRGE YAP)</div></a>', unsafe_allow_html=True)
         st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
         df_goster_sirali = df_goster.sort_values(by="Sıra No", ascending=True) if not df_goster.empty else df_goster
@@ -310,7 +311,7 @@ else:
                 s_sira = int(str(secilen_sil_p_sube).replace("Sıra No: ", "").split(" | ").strip())
                 conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                 cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
-                conn.commit(); conn.close(); st.success("Beklemedeki personel silindi!"); st.rerun()
+                conn.commit(); conn.close(); st.success("Beklemedeki personel kartı silindi!"); st.rerun()
 
     elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
         st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
@@ -372,6 +373,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
+
 
 
 
