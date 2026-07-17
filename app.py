@@ -222,10 +222,10 @@ else:
                 if secilen_islem_metni:
                     parts = str(secilen_islem_metni).split(" | ")
                     secilen_sira_no = int(parts[0].replace("Sıra No: ", "").strip())
-                    st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3);">🌐 SGK İŞE GİRİŞ ÇIKIŞ GÖRÜNTÜLEME</div></a>', unsafe_allow_html=True)
+                    st.markdown(f'<a href="https://uyg.sgk.gov.tr/SigortaliTescil/amp/loginldap" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3);">🌐 SGK İŞE GİRİŞ ÇIKIŞ GÖRÜNTÜLEME</div></a>', unsafe_allow_html=True)
                     o1, o2 = st.columns(2)
                     with o1:
-                        mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values[0]).upper()
+                        mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values).upper()
                         if "GİRİŞ" in mevcut_bekleyen_durum:
                             if st.button("✅ SGK GİRİŞİNE RESMİ ONAY VER", use_container_width=True):
                                 conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
@@ -273,7 +273,7 @@ else:
             with f_sub_col2: p_durum = st.selectbox("DURUMU", ["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"], index=1 if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" else 0)
             with f_sub_col3: p_fark_gun_elle = st.text_input("ÇIKIŞ GÜN SAYISI", value=varsayilan_fark)
             
-            st.text_input("FİRMA BİLGİSİ", value=st.session_state["firma"], disabled=True)
+            st.text_input("FİRMA BİGIİSİ", value=st.session_state["firma"], disabled=True)
             
             if st.form_submit_button("💾 VERİYİ OTOMATİK VERİTABANINA İŞLE", use_container_width=True):
                 if p_adi.strip() != "" and p_tc.strip() != "":
@@ -290,7 +290,7 @@ else:
                     conn.commit(); conn.close(); st.success("✔️ Başarıyla işlendi!"); time.sleep(0.5); st.rerun()
                 else: st.error("❌ İsim ve TC boş geçilemez!")
         
-        st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-top:10px;margin-bottom:20px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3); font-size:16px;">🌐 SGK İŞE GİRİŞ ÇIKIŞ GÖRÜNTÜLEME</div></a>', unsafe_allow_html=True)
+        st.markdown(f'<a href="https://uyg.sgk.gov.tr/SigortaliTescil/amp/loginldap" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-top:10px;margin-bottom:20px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3); font-size:16px;">🌐 SGK İŞE GİRİŞ ÇIKIŞ GÖRÜNTÜLEME</div></a>', unsafe_allow_html=True)
         st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
         df_goster_sirali = df_goster.sort_values(by="Sıra No", ascending=True) if not df_goster.empty else df_goster
         if not df_goster_sirali.empty:
@@ -354,7 +354,6 @@ else:
     elif st.session_state["rol"] in ["merkez", "izleyici"]:
         tab1, tab2 = st.tabs(["👥 CANLI MASTER PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI"])
         with tab1:
-            # 📊 MERKEZ KULLANICILARI İÇİN ARTIK HİÇBİR ŞEYİ BOZMAYAN TOPLU EXCEL / CSV AKTARIM ALANI
             with st.expander("📥 EXCEL / CSV DOSYASINDAN TOPLU PERSONEL AKTARIMI (MERKEZ ÖZEL)"):
                 st.info("💡 Yükleyeceğiniz Excel veya CSV dosyasındaki sütun başlıkları şu şekilde olmalıdır:\n'Sıra No', 'Adı Soyadı', 'TC Kimlik No', 'Doğum Tarihi', 'İşe Giriş Tarihi', 'İşten Çıkış Tarihi', 'Birimi', 'Şantiye Bilgisi', 'Firma Bilgisi', 'Giriş/Çıkış Durumu', 'Çalışma Durumu', 'Çıkış Gün Sayısı'")
                 yuklenen_dosya = st.file_uploader("Personel Excel Listesini Seçin", type=["xlsx", "xls", "csv"])
@@ -362,7 +361,7 @@ else:
                     try:
                         if yuklenen_dosya.name.endswith('.csv'):
                             df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str)
-                            if df_toplu.shape[1] <= 1:
+                            if df_toplu.shape[0] <= 1:
                                 yuklenen_dosya.seek(0)
                                 df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str)
                         else:
@@ -428,5 +427,6 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
+
 
 
