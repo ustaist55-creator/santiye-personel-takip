@@ -354,16 +354,36 @@ else:
     elif st.session_state["rol"] in ["merkez", "izleyici"]:
         tab1, tab2 = st.tabs(["👥 CANLI MASTER PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI"])
         with tab1:
+            # 📊 MERKEZ KULLANICILARI İÇİN ARTIK HİÇBİR ŞEYİ BOZMAYAN VE KODLAMA HATASI VERMEYEN TOPLU AKTARIM MOTORU
             with st.expander("📥 EXCEL / CSV DOSYASINDAN TOPLU PERSONEL AKTARIMI (MERKEZ ÖZEL)"):
                 st.info("💡 Yükleyeceğiniz Excel veya CSV dosyasındaki sütun başlıkları şu şekilde olmalıdır:\n'Sıra No', 'Adı Soyadı', 'TC Kimlik No', 'Doğum Tarihi', 'İşe Giriş Tarihi', 'İşten Çıkış Tarihi', 'Birimi', 'Şantiye Bilgisi', 'Firma Bilgisi', 'Giriş/Çıkış Durumu', 'Çalışma Durumu', 'Çıkış Gün Sayısı'")
                 yuklenen_dosya = st.file_uploader("Personel Excel Listesini Seçin", type=["xlsx", "xls", "csv"])
                 if yuklenen_dosya is not None:
                     try:
                         if yuklenen_dosya.name.endswith('.csv'):
-                            df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str)
-                            if df_toplu.shape[0] <= 1:
+                            # 🛡️ TÜRKÇE KARAKTER FORMAT ÇÖKMELERİNİ ENGELLEYEN OTOMATİK ZIRH SİSTEMİ
+                            try:
                                 yuklenen_dosya.seek(0)
-                                df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str)
+                                df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='utf-8')
+                            except UnicodeDecodeError:
+                                try:
+                                    yuklenen_dosya.seek(0)
+                                    df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='iso-8859-9')
+                                except UnicodeDecodeError:
+                                    yuklenen_dosya.seek(0)
+                                    df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='cp1254')
+                                    
+                            if df_toplu.shape[1] <= 1:
+                                try:
+                                    yuklenen_dosya.seek(0)
+                                    df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='utf-8')
+                                except UnicodeDecodeError:
+                                    try:
+                                        yuklenen_dosya.seek(0)
+                                        df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='iso-8859-9')
+                                    except UnicodeDecodeError:
+                                        yuklenen_dosya.seek(0)
+                                        df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='cp1254')
                         else:
                             df_toplu = pd.read_excel(yuklenen_dosya, dtype=str)
                         
@@ -427,6 +447,4 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
-
-
 
