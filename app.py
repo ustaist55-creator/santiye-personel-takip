@@ -176,7 +176,6 @@ if st.session_state["rol"] == "sube" and menu_secim == "Personel Giriş / Çık�
                     cursor.execute("SELECT MAX(sira_no) FROM personel")
                     row_val = cursor.fetchone()
                     
-                    # Boş veritabanında patlamayı önleyen hatasız akıllı sıra no üretici
                     if row_val[0] is not None:
                         sira_no = int(row_val[0]) + 1
                     else:
@@ -200,7 +199,7 @@ if st.session_state["rol"] == "sube" and menu_secim == "Personel Giriş / Çık�
             p_listesi = df_sube_aktif.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']} ({r['Giriş/Çıkış Durumu']})", axis=1).tolist()
             secilen_p_str = st.selectbox("Güncellenecek Personeli Seçin", p_listesi)
             
-            # Dilimleme ve ayıklama işlemlerinin çökmesini önleyen güvenli metin ayırıcı
+            # Tamamen onarılmış hatasız string temizleyici
             secilen_sira = int(str(secilen_p_str).split(" | ")[0].replace("Sıra No: ", "").strip())
             p_bilgi = df_sube_aktif[df_sube_aktif["Sıra No"] == secilen_sira].iloc[0]
             
@@ -371,17 +370,6 @@ elif st.session_state["rol"] in ["merkez", "izleyici"] and menu_secim == "Merkez
         with fp_col1: secilen_fp_santiye = st.selectbox("Puantaj Şantiye Seçimi", ["HEPSİ", "CANİK", "GAZİETHEMPAŞA", "OFİS", "TEPECİK ABLOK", "POLATLI", "GİRESUN", "İSTANBUL", "MORFOLOJİ", "YAYLADERE", "MERKZE İŞYERİ-2", "KILIÇDEDE2"])
         with fp_col2: secilen_fp_ay = st.selectbox("Dönem Ay Seçimi", ["HEPSİ", "OCAK", "ŞUBAT", "MART", "NİSAN", "MAYIS", "HAZİRAN", "TEMMUZ", "AĞUSTOS", "EYLÜL", "EKİM", "KASIM", "ARALIK"])
         df_merkez_pt_filtreli = df_puantaj_canli.copy()
-        if secilen_fp_santiye != "HE5Sİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
+        if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
         if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
         st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
-
-
-
-
-
-
-
-
-
-
-
