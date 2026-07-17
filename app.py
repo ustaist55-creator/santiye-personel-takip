@@ -140,7 +140,7 @@ def tarih_formatla(metin):
     elif len(temiz) >= 3: return f"{temiz[:2]}.{temiz[2:]}"
     return temiz
 
-# 🎯 MADDE 2: 12 SÜTUNUN TAMAMINI PARÇALAMADAN YAN YANA AKTARAN EXCEL MOTORU
+# 🎯 MADDE 2: 12 SÜTUNUN TAMAMINI PARÇALAMADAN YAN YANA AKTARAN KURUMSAL EXCEL MOTORU
 def kurumsal_rapor_uret(df_data):
     if df_data.empty: return "".encode('utf-8-sig')
     df_excel = pd.DataFrame()
@@ -184,7 +184,7 @@ else:
         if st.button("Canlı Verileri Yenile", use_container_width=True): st.rerun()
     with col_u3:
         if st.button("SİSTEMDEN GÜVENLİ ÇIKIŞ", use_container_width=True):
-            # 🎯 %100 RESMİ SYNTAX YAMASI: 187. satırdaki hatalı tek satır kodlaması düzeltildi, alt alta zırhlandı!
+            # 🔒 SYNTAX HATASI ARNDIRILDI: Tek satırda noktalı virgülden sonra gelen try-except bloğu nizami alt alta satırlara bölündü!
             st.session_state["giris_yapildi"] = False
             try: cookie_manager.delete("saved_user")
             except: pass
@@ -223,7 +223,8 @@ else:
                 secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
                     secilen_sira_no = int(str(secilen_islem_metni).replace("Sıra No: ", "").split(" | ").strip())
-                    st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3);">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN</div></a>', unsafe_allow_html=True)
+                    # 🎯 3. MADDE NOKTA ATIŞI: Merkez butonu doğrudan istediğin o resmi loginldap linkine mühürlendi!
+                    st.markdown(f'<a href="https://uyg.sgk.gov.tr/SigortaliTescil/amp/loginldap" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3);">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN (BİLDİRGE YAP)</div></a>', unsafe_allow_html=True)
                     o1, o2 = st.columns(2)
                     with o1:
                         mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values).upper()
@@ -290,8 +291,8 @@ else:
                     conn.commit(); conn.close(); st.success("✔️ Başarıyla işlendi!"); time.sleep(0.5); st.rerun()
                 else: st.error("❌ İsim ve TC boş geçilemez!")
         
-        # 🎯 MADDE 3: İşte aradığın kurumsal kıpkırmızı dev SGK butonu tam form kilidinin altında!
-        st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-top:10px;margin-bottom:20px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3); font-size:16px;">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN (BİLDİRGE YAP)</div></a>', unsafe_allow_html=True)
+        # 🎯 3. MADDE NOKTA ATIŞI: Şantiye paneli altındaki kıpkırmızı buton da doğrudan istediğin o resmi loginldap sayfasına bağlandı!
+        st.markdown(f'<a href="https://uyg.sgk.gov.tr/SigortaliTescil/amp/loginldap" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-top:10px;margin-bottom:20px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3); font-size:16px;">🌐 RESMİ SGK İŞE GİRİŞ / ÇIKIŞ SİSTEMİNE BAĞLAN (BİLDİRGE YAP)</div></a>', unsafe_allow_html=True)
         st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
         df_goster_sirali = df_goster.sort_values(by="Sıra No", ascending=True) if not df_goster.empty else df_goster
         if not df_goster_sirali.empty:
@@ -373,6 +374,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
+
 
 
 
