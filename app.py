@@ -221,11 +221,11 @@ else:
                 secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
                     parts = str(secilen_islem_metni).split(" | ")
-                    secilen_sira_no = int(parts.replace("Sıra No: ", "").strip())
+                    secilen_sira_no = int(parts[0].replace("Sıra No: ", "").strip())
                     st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#E11D48;color:white;padding:12px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(225,29,72,0.3);">🌐 SGK İŞE GİRİŞ ÇIKIŞ GÖRÜNTÜLEME</div></a>', unsafe_allow_html=True)
                     o1, o2 = st.columns(2)
                     with o1:
-                        mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values).upper()
+                        mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values[0]).upper()
                         if "GİRİŞ" in mevcut_bekleyen_durum:
                             if st.button("✅ SGK GİRİŞİNE RESMİ ONAY VER", use_container_width=True):
                                 conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
@@ -252,7 +252,7 @@ else:
                     g_sira_no = int(match_g_sira.group(1))
                     filtered_df = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)]
                     if not filtered_df.empty:
-                        p_satir = filtered_df.iloc
+                        p_satir = filtered_df.iloc[0]
                         varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                         varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir["Çıkış Gün Sayısı"])
         
@@ -284,7 +284,7 @@ else:
                     else:
                         cursor.execute("SELECT MAX(sira_no) FROM personel")
                         row_val = cursor.fetchone()
-                        sira_no = int(row_val) + 1 if row_val and row_val is not None else 1
+                        sira_no = int(row_val[0]) + 1 if row_val and row_val[0] is not None else 1
                     
                     cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
                     conn.commit(); conn.close(); st.success("✔️ Başarıyla işlendi!"); time.sleep(0.5); st.rerun()
@@ -362,7 +362,7 @@ else:
                     try:
                         if yuklenen_dosya.name.endswith('.csv'):
                             df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str)
-                            if df_toplu.shape[1] == 1:
+                            if df_toplu.shape[1] <= 1:
                                 yuklenen_dosya.seek(0)
                                 df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str)
                         else:
@@ -404,6 +404,7 @@ else:
             if secilen_f_santiye != "HEPSİ": df_merkez_p_filtreli = df_merkez_p_filtreli[df_merkez_p_filtreli["Şantiye Bilgisi"] == secilen_f_santiye]
             if secilen_f_durum != "HEPSİ": df_merkez_p_filtreli = df_merkez_p_filtreli[df_merkez_p_filtreli["Giriş/Çıkış Durumu"] == secilen_f_durum]
             df_merkez_p_filtreli = df_merkez_p_filtreli.sort_values(by="Sıra No", ascending=True) if not df_merkez_p_filtreli.empty else df_merkez_p_filtreli
+            
             try:
                 st.dataframe(df_merkez_p_filtreli.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
             except AttributeError:
