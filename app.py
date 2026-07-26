@@ -158,7 +158,7 @@ if not st.session_state["giris_yapildi"]:
         st.markdown("<h3 style='text-align: center; color: #2B6CB0;'>🏛️ PERSONEL TAKİP</h3>", unsafe_allow_html=True)
         beni_hatirla_check = st.checkbox("Beni Hatırla")
         with st.form("login_form"):
-            kullanici_adi = st.text_input("Kullanıcı Adı"); sifre = st.text_input("Şifre", type="password")
+            kullanici_adi = st.text_input("Kullanıcı Adı"); sifre = st.text_input("Şre", type="password")
             if st.form_submit_button("SİSTEME GÜVENLİ GİRİŞ YAP", use_container_width=True):
                 if kullanici_adi in KULLANICILAR and KULLANICILAR[kullanici_adi]["sifre"] == sifre:
                     st.session_state["giris_yapildi"] = True; st.session_state["kullanici"] = kullanici_adi
@@ -215,7 +215,6 @@ else:
                 secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
                     parts = str(secilen_islem_metni).split(" | ")
-                    # 🔥 LİSTEYİ DEĞİL SAF METNİ PARÇALAYAN VE SİSTEMİN ÇÖKMESİNİ ENGELLEYEN TAMİR MOTORU
                     secilen_sira_no = int(parts[0].replace("Sıra No: ", "").strip())
                     st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(211,47,47,0.3);font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP (E-BİLDİRGE EKRANI)</div></a>', unsafe_allow_html=True)
                     o1, o2 = st.columns(2)
@@ -248,7 +247,7 @@ else:
                     g_sira_no = int(match_g_sira.group(1))
                     filtered_df = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)]
                     if not filtered_df.empty:
-                        p_satir = filtered_df.iloc
+                        p_satir = filtered_df.iloc[0]
                         varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                         varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir["Çıkış Gün Sayısı"])
         
@@ -285,7 +284,6 @@ else:
                     cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
                     conn.commit(); conn.close(); st.success("✔️ Başarıyla işlendi!"); time.sleep(0.5); st.rerun()
                 else: st.error("❌ İsim ve TC boş geçilemez!")
-        
         st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-top:10px;margin-bottom:20px;box-shadow: 0 4px 6px -1px rgba(211,47,47,0.3); font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP (E-BİLDİRGE EKRANI)</div></a>', unsafe_allow_html=True)
         st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
         df_goster_sirali = df_goster.sort_values(by="Sıra No", ascending=True) if not df_goster.empty else df_goster
@@ -310,7 +308,8 @@ else:
                 conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                 cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
                 conn.commit(); conn.close(); st.success("Beklemedeki personel kartı silindi!"); st.rerun()
-       elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
+
+    elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
         st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
         col_p1, col_p2 = st.columns(2)
         with col_p1:
@@ -342,8 +341,7 @@ else:
                     conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = ?", (sil_id,))
                     conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
-
-    elif st.session_state["rol"] in ["merkez", "izleyici"]:
+    if st.session_state["rol"] in ["merkez", "izleyici"]:
         tab1, tab2 = st.tabs(["👥 CANLI MASTER PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI"])
         with tab1:
             with st.expander("📥 EXCEL / CSV DOSYASINDAN TOPLU PERSONEL AKTARIMI (MERKEZ ÖZEL)"):
@@ -358,7 +356,7 @@ else:
                                 try: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='iso-8859-9')
                                 except UnicodeDecodeError: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='cp1254')
                             
-                            # 🔥 TUPLE KIYASLAMA HATASINI KÖKTEN BİTİREN SATIR SAYISI KONTROLÜ (.shape[0])
+                            # 🔥 TUPLE KIYASLAMA HATASINI KÖKTEN ÇÖZEN SHAPE-SATIR KONTROLÜ
                             if not df_toplu.empty and df_toplu.shape[0] <= 1:
                                 try: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='utf-8')
                                 except UnicodeDecodeError:
@@ -376,10 +374,39 @@ else:
                                     if pd.isna(r["Adı Soyadı"]) or pd.isna(r["TC Kimlik No"]): continue
                                     cursor.execute("SELECT MAX(sira_no) FROM personel")
                                     max_row = cursor.fetchone()
-                                    # 🔥 TOPLU AKTARIMDA DA TUPLE ÇÖKMESİNİ ENGELLEYEN ZIRH
+                                    # 🔥 TOPLU AKTARIMDA DA SIRA NO ALIRKEN TUPLE ÇÖKMESİNİ ENGELLEYEN DEFANS
                                     yeni_sira = int(max_row[0]) + 1 if max_row and max_row[0] is not None else 1
                                     cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(yeni_sira), str(r["Adı Soyadı"]).strip().upper(), str(r["TC Kimlik No"]).strip(), str(r["Doğum Tarihi"]), str(r["İşe Giriş Tarihi"]), str(r["İşten Çıkış Tarihi"]), str(r["Birimi"]), str(r["Şantiye Bilgisi"]), str(r["Firma Bilgisi"]), str(r["Giriş/Çıkış Durumu"]), str(r["Çalışma Durumu"]), str(r["Çıkış Gün Sayısı"])))
                                     aktarilan_adet += 1
                                 conn.commit(); conn.close(); st.success(f"✔️ {aktarilan_adet} adet başarıyla işlendi!"); time.sleep(0.5); st.rerun()
                     except Exception as ex: st.error(f"❌ Hata: {ex}")
+
+            f_col1, f_col2 = st.columns(2)
+            with f_col1: secilen_f_santiye = st.selectbox("Şantiye Şube Seçimi", ["HEPSİ", "CANİK", "GAZİETHEMPAŞA", "OFİS", "TEPECİK ABLOK", "POLATLI", "GİRESUN", "İSTANBUL", "MORFOLOJİ", "YAYLADERE", "MERKZE İŞYERİ-2", "KILIÇDEDE2"])
+            with f_col2: secilen_f_durum = st.selectbox("SGK Onay Durumu", ["HEPSİ", "SGK GİRİŞİ YAPILDI", "SGK ÇIKIŞI YAPILDI", "GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])
+            df_merkez_p_filtreli = df_canli.copy()
+            if secilen_f_santiye != "HEPSİ": df_merkez_p_filtreli = df_merkez_p_filtreli[df_merkez_p_filtreli["Şantiye Bilgisi"] == secilen_f_santiye]
+            if secilen_f_durum != "HEPSİ": df_merkez_p_filtreli = df_merkez_p_filtreli[df_merkez_p_filtreli["Giriş/Çıkış Durumu"] == secilen_f_durum]
+            df_merkez_p_filtreli = df_merkez_p_filtreli.sort_values(by="Sıra No", ascending=True) if not df_merkez_p_filtreli.empty else df_merkez_p_filtreli
+            try: st.dataframe(df_merkez_p_filtreli.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
+            except AttributeError: st.dataframe(df_merkez_p_filtreli.style.applymap(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
+            st.download_button(label="📥 MASTER EXCEL RAPORU İNDİR (12 SÜTUN TAM)", data=kurumsal_rapor_uret(df_merkez_p_filtreli), file_name="master_personel.csv", mime="text/csv", use_container_width=True)
+            if st.session_state["rol"] == "merkez" and not df_merkez_p_filtreli.empty:
+                m_p_sil_list = df_merkez_p_filtreli.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
+                m_secilen_sil = st.selectbox("MASTER SİLME: Personel Seçin", m_p_sil_list)
+                if st.button("🔥 SEÇİLİ PERSONELİ VERİTABANINA KALICI OLARAK SİL", use_container_width=True):
+                    parts_m_sil = str(m_secilen_sil).split(" | ")
+                    m_sil_sira = int(parts_m_sil[0].replace("Sıra No: ", "").strip())
+                    conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
+                    cursor.execute("DELETE FROM personel WHERE sira_no = ?", (m_sil_sira,))
+                    conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
+        with tab2:
+            fp_col1, fp_col2 = st.columns(2)
+            with fp_col1: secilen_fp_santiye = st.selectbox("Puantaj Şantiye Seçimi", ["HEPSİ", "CANİK", "GAZİETHEMPAŞA", "OFİS", "TEPECİK ABLOK", "POLATLI", "GİRESUN", "İSTANBUL", "MORFOLOJİ", "YAYLADERE", "MERKZE İŞYERİ-2", "KILIÇDEDE2"])
+            with fp_col2: secilen_fp_ay = st.selectbox("Dönem Ay Seçimi", ["HEPSİ", "OCAK", "ŞUBAT", "MART", "NİSAN", "MAYIS", "HAZİRAN", "TEMMUZ", "AĞUSTOS", "EYLÜL", "EKİM", "KASIM", "ARALIK"])
+            df_merkez_pt_filtreli = df_puantaj_canli.copy()
+            if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
+            if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
+            st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
+
 
