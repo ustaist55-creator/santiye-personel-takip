@@ -1,4 +1,4 @@
-import streamlit st
+import streamlit as st
 import pandas as pd
 import datetime
 import os
@@ -297,7 +297,6 @@ else:
             with r_col2:
                 if st.button("🖨️ BU LİSTEYİ RESMİ PDF YAP / YAZDIR", use_container_width=True): st.markdown("<script>window.print();</script>", unsafe_allow_html=True)
         else: st.info("💡 Kayıtlı personel bulunmuyor.")
-
         df_sube_silinebilir = df_goster[df_goster["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])] if not df_goster.empty else pd.DataFrame()
         if not df_sube_silinebilir.empty:
             st.markdown("---")
@@ -309,38 +308,39 @@ else:
                 conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                 cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
                 conn.commit(); conn.close(); st.success("Beklemedeki personel kartı silindi!"); st.rerun()
-elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
-    st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        df_puantaj_aktif = df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"] if not df_goster.empty else pd.DataFrame()
-        if df_puantaj_aktif.empty: st.warning("⚠️ Onaylı aktif çalışan personel bulunmalıdır!")
-        else:
-            with st.form("puantaj_form", clear_on_submit=True):
-                p_secenekler = df_puantaj_aktif.apply(lambda r: f"{r['Adı Soyadı']} ({r['TC Kimlik No']})", axis=1).tolist()
-                secilen_p = st.selectbox("Personel Seçin", p_secenekler)
-                donem_ay = st.selectbox("Puantaj Dönemi", ["OCAK", "ŞUBAT", "MART", "NİSAN", "MAYIS", "HAZİRAN", "TEMMUZ", "AĞUSTOS", "EYLÜL", "EKİM", "KASIM", "ARALIK"])
-                calisilan_gun = st.number_input("Çalışılan Gün Sayısı", min_value=0, max_value=31, value=26)
-                sefi_adi = st.text_input("Giriş Yapan Yetkili")
-                if st.form_submit_button("💾 PUANTAJI MERKEZE GÖNDER", use_container_width=True):
-                    p_str = str(secilen_p); p_str_parts = p_str.split(" (")
-                    p_ad_parca = p_str_parts.strip(); p_tc_parca = p_str_parts.replace(")", "").strip()
-                    su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
+        st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            df_puantaj_aktif = df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"] if not df_goster.empty else pd.DataFrame()
+            if df_puantaj_aktif.empty: st.warning("⚠️ Onaylı aktif çalışan personel bulunmalıdır!")
+            else:
+                with st.form("puantaj_form", clear_on_submit=True):
+                    p_secenekler = df_puantaj_aktif.apply(lambda r: f"{r['Adı Soyadı']} ({r['TC Kimlik No']})", axis=1).tolist()
+                    secilen_p = st.selectbox("Personel Seçin", p_secenekler)
+                    donem_ay = st.selectbox("Puantaj Dönemi", ["OCAK", "ŞUBAT", "MART", "NİSAN", "MAYIS", "HAZİRAN", "TEMMUZ", "AĞUSTOS", "EYLÜL", "EKİM", "KASIM", "ARALIK"])
+                    calisilan_gun = st.number_input("Çalışılan Gün Sayısı", min_value=0, max_value=31, value=26)
+                    sefi_adi = st.text_input("Giriş Yapan Yetkili")
+                    if st.form_submit_button("💾 PUANTAJI MERKEZE GÖNDER", use_container_width=True):
+                        p_str = str(secilen_p); p_str_parts = p_str.split(" (")
+                        p_ad_parca = p_str_parts.strip(); p_tc_parca = p_str_parts.replace(")", "").strip()
+                        su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
+                        cursor.execute("DELETE FROM puantaj WHERE tc_no = ? AND donem_ay = ? AND santiye = ?", (p_tc_parca, donem_ay, st.session_state["santiye"]))
+                        cursor.execute("INSERT INTO puantaj (tarih_satir, santiye, personel_adi, tc_no, donem_ay, gun_sayisi, giren_sef) VALUES (?, ?, ?, ?, ?, ?, ?)", (su_an_p, str(st.session_state["santiye"]), str(p_ad_parca), str(p_tc_parca), str(donem_ay), int(calisilan_gun), sefi_adi.upper()))
+                        conn.commit(); conn.close(); st.success("✔️ Puantaj Kilitlendi!"); time.sleep(0.5); st.rerun()
+        with col_p2:
+            st.dataframe(df_p_goster.iloc[::-1] if not df_p_goster.empty else df_p_goster, use_container_width=True, hide_index=True)
+            if not df_p_goster.empty:
+                p_silme_listesi = df_p_goster.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']}", axis=1).tolist()
+                secilen_p_sil_id = st.selectbox("Hatalı Kaydı Seçin", p_silme_listesi)
+                if st.button("❌ SEÇİLİ PUANTAJI LİSTEDEN SİL", use_container_width=True):
+                    parts_p_sil = str(secilen_p_sil_id).split(" | ")
+                    sil_id = int(parts_p_sil.replace("ID: ", "").strip())
                     conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
-                    cursor.execute("DELETE FROM puantaj WHERE tc_no = ? AND donem_ay = ? AND santiye = ?", (p_tc_parca, donem_ay, st.session_state["santiye"]))
-                    cursor.execute("INSERT INTO puantaj (tarih_satir, santiye, personel_adi, tc_no, donem_ay, gun_sayisi, giren_sef) VALUES (?, ?, ?, ?, ?, ?, ?)", (su_an_p, str(st.session_state["santiye"]), str(p_ad_parca), str(p_tc_parca), str(donem_ay), int(calisilan_gun), sefi_adi.upper()))
-                    conn.commit(); conn.close(); st.success("✔️ Puantaj Kilitlendi!"); time.sleep(0.5); st.rerun()
-    with col_p2:
-        st.dataframe(df_p_goster.iloc[::-1] if not df_p_goster.empty else df_p_goster, use_container_width=True, hide_index=True)
-        if not df_p_goster.empty:
-            p_silme_listesi = df_p_goster.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']}", axis=1).tolist()
-            secilen_p_sil_id = st.selectbox("Hatalı Kaydı Seçin", p_silme_listesi)
-            if st.button("❌ SEÇİLİ PUANTAJI LİSTEDEN SİL", use_container_width=True):
-                parts_p_sil = str(secilen_p_sil_id).split(" | ")
-                sil_id = int(parts_p_sil.replace("ID: ", "").strip())
-                conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
-                cursor.execute("DELETE FROM puantaj WHERE id = ?", (sil_id,))
-                conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
+                    cursor.execute("DELETE FROM puantaj WHERE id = ?", (sil_id,))
+                    conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
 elif st.session_state["rol"] in ["merkez", "izleyici"]:
     tab1, tab2 = st.tabs(["👥 CANLI MASTER PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI"])
     with tab1:
@@ -376,6 +376,7 @@ elif st.session_state["rol"] in ["merkez", "izleyici"]:
                                 aktarilan_adet += 1
                             conn.commit(); conn.close(); st.success(f"✔️ {aktarilan_adet} adet işlendi!"); time.sleep(0.5); st.rerun()
                 except Exception as ex: st.error(f"❌ Hata: {ex}")
+
         f_col1, f_col2 = st.columns(2)
         with f_col1: secilen_f_santiye = st.selectbox("Şantiye Şube Seçimi", ["HEPSİ", "CANİK", "GAZİETHEMPAŞA", "OFİS", "TEPECİK ABLOK", "POLATLI", "GİRESUN", "İSTANBUL", "MORFOLOJİ", "YAYLADERE", "MERKZE İŞYERİ-2", "KILIÇDEDE2"])
         with f_col2: secilen_f_durum = st.selectbox("SGK Onay Durumu", ["HEPSİ", "SGK GİRİŞİ YAPILDI", "SGK ÇIKIŞI YAPILDI", "GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])
@@ -403,6 +404,7 @@ elif st.session_state["rol"] in ["merkez", "izleyici"]:
         if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
         if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
         st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
+
 
 
 
