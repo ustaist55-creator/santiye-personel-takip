@@ -215,7 +215,8 @@ else:
                 secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
                 if secilen_islem_metni:
                     parts = str(secilen_islem_metni).split(" | ")
-                    secilen_sira_no = int(parts.replace("Sıra No: ", "").strip())
+                    # 🔥 LİSTEYİ DEĞİL SAF METNİ PARÇALAYAN VE SİSTEMİN ÇÖKMESİNİ ENGELLEYEN TAMİR MOTORU
+                    secilen_sira_no = int(parts[0].replace("Sıra No: ", "").strip())
                     st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(211,47,47,0.3);font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP (E-BİLDİRGE EKRANI)</div></a>', unsafe_allow_html=True)
                     o1, o2 = st.columns(2)
 
@@ -279,7 +280,6 @@ else:
                     else:
                         cursor.execute("SELECT MAX(sira_no) FROM personel")
                         row_val = cursor.fetchone()
-                        # BOŞ VERİTABANINDA TUPLE YAPISININ HATA VERMESİNİ ENGELLEYEN SIRA NO MOTORU
                         sira_no = int(row_val[0]) + 1 if row_val and row_val[0] is not None else 1
                     
                     cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
@@ -306,7 +306,7 @@ else:
             secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
             if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
                 parts_sil = str(secilen_sil_p_sube).split(" | ")
-                s_sira = int(parts_sil.replace("Sıra No: ", "").strip())
+                s_sira = int(parts_sil[0].replace("Sıra No: ", "").strip())
                 conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
                 cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
                 conn.commit(); conn.close(); st.success("Beklemedeki personel kartı silindi!"); st.rerun()
@@ -343,7 +343,6 @@ else:
                     cursor.execute("DELETE FROM puantaj WHERE id = ?", (sil_id,))
                     conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
 
-    # 🔥 ZİNCİR HATASINI BİTİREN BAĞIMSIZ YENİ IF BAŞLANGICI
     if st.session_state["rol"] in ["merkez", "izleyici"]:
         tab1, tab2 = st.tabs(["👥 CANLI MASTER PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI"])
         with tab1:
@@ -358,7 +357,7 @@ else:
                             except UnicodeDecodeError:
                                 try: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='iso-8859-9')
                                 except UnicodeDecodeError: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='cp1254')
-                            if df_toplu.shape[1] <= 1:
+                            if df_toplu.shape <= 1:
                                 try: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='utf-8')
                                 except UnicodeDecodeError:
                                     try: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='iso-8859-9')
@@ -406,6 +405,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
+
 
 
 
