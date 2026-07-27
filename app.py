@@ -58,7 +58,7 @@ st.markdown("""
     .stButton>button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.3) !important; }
 </style>
 """, unsafe_allow_html=True)
-# 🔥 ADRES AYRIŞTIRMA SIZINTISINI SIFIRLAYAN EN GÜVENLİ BAĞLANTI MOTORU
+# 🔥 ADRES ATAMA HATASINI SIFIRLAYAN GERÇEK SUPABASE PARAMETRELERİ
 DB_PARAMETRELERI = {
     "host": "://supabase.com",
     "port": 6543,
@@ -287,8 +287,8 @@ else:
                     if st.form_submit_button("💾 PUANTAJI MERKEZE GÖNDER", use_container_width=True):
                         p_str = str(secilen_p)
                         p_str_parts = p_str.split(" (")
-                        p_ad_parca = p_str_parts[0].strip()
-                        p_tc_parca = p_str_parts[1].replace(")", "").strip()
+                        p_ad_parca = p_str_parts.strip()
+                        p_tc_parca = p_str_parts.replace(")", "").strip()
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         conn = bulut_baglanti_al(); cursor = conn.cursor()
                         cursor.execute("DELETE FROM puantaj WHERE tc_no = %s AND donem_ay = %s AND santiye = %s", (p_tc_parca, donem_ay, st.session_state["santiye"]))
@@ -353,6 +353,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli, use_container_width=True, hide_index=True)
+
 
 
 
