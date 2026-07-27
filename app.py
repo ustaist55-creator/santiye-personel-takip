@@ -4,7 +4,8 @@ import datetime
 import os
 import io
 import time
-import sqlite3
+import psycopg2
+from psycopg2 import extras
 import re
 import extra_streamlit_components as stx
 
@@ -18,7 +19,7 @@ st.markdown("""
         display: none !important;
         visibility: hidden !important;
     }
-    [data-testid="stStatusWidget"], div[class^="viewerBadge"], div[class*="MainMenu"], iframe[title="st.iframe"] {
+    [data-testid="stStatusWidget"], div[class^="viewerBadge"] {
         display: none !important;
         visibility: hidden !important;
     }
@@ -44,8 +45,6 @@ st.markdown("""
         border-left: 5px solid #319795 !important;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
     }
-    div[data-testid="stMetric"] label { color: #64748B !important; font-weight: 600 !important; }
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #0F172A !important; font-weight: bold !important; }
     div[data-testid="stForm"] {
         background-color: #FFFFFF !important;
         border-radius: 14px !important;
@@ -59,39 +58,36 @@ st.markdown("""
     .stButton>button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.3) !important; }
 </style>
 """, unsafe_allow_html=True)
-# SERVER SIFIRLANMASINI ENGELLEYEN AKILLI BULUT SECRETS BAĞLANTI AYARI
-if "database" in st.secrets:
-    DB_YOLU = st.secrets["database"]["yol"]
-else:
-    DB_YOLU = "santiye_master_veri.db"
+# BULUT VERİTABANI BAĞLANTI AYARI
+DB_CONN_STR = st.secrets["database"]["baglanti"]
 
-def sql_altyapi_kur():
-    conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
+def bulut_altyapi_kur():
+    conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS personel (
-            sira_no INTEGER PRIMARY KEY, adi_soyadi TEXT, tc_no TEXT, dogum_tarihi TEXT,
+            sira_no SERIAL PRIMARY KEY, adi_soyadi TEXT, tc_no TEXT, dogum_tarihi TEXT,
             ise_giris TEXT, isten_cikis TEXT, birimi TEXT, santiye TEXT, firma TEXT,
             durum TEXT, calisma_sekli TEXT, fark_gun TEXT
         )
     """)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS puantaj (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, tarih_satir TEXT, santiye TEXT,
+            id SERIAL PRIMARY KEY, tarih_satir TEXT, santiye TEXT,
             personel_adi TEXT, tc_no TEXT, donem_ay TEXT, gun_sayisi INTEGER, giren_sef TEXT
         )
     """)
     conn.commit(); conn.close()
 
-sql_altyapi_kur()
+bulut_altyapi_kur()
 
-def verileri_yukle_sql():
-    conn = sqlite3.connect(DB_YOLU)
-    df_p = pd.read_sql_query("SELECT sira_no as 'Sıra No', adi_soyadi as 'Adı Soyadı', tc_no as 'TC Kimlik No', dogum_tarihi as 'Doğum Tarihi', ise_giris as 'İşe Giriş Tarihi', isten_cikis as 'İşten Çıkış Tarihi', birimi as 'Birimi', santiye as 'Şantiye Bilgisi', firma as 'Firma Bilgisi', durum as 'Giriş/Çıkış Durumu', calisma_sekli as 'Çalışma Durumu', fark_gun as 'Çıkış Gün Sayısı' FROM personel", conn)
-    df_pt = pd.read_sql_query("SELECT id as 'Kayıt ID', tarih_satir as 'Tarih_Saat', santiye as 'Şantiye', personel_adi as 'Personel_Adi', tc_no as 'TC_Kimlik', donem_ay as 'Dönem_Ay', gun_sayisi as 'Çalışılan_Gün_Sayısı', giren_sef as 'Giren_Sef' FROM puantaj", conn)
+def verileri_yukle_bulut():
+    conn = psycopg2.connect(DB_CONN_STR)
+    df_p = pd.read_sql_query("SELECT sira_no as \"Sıra No\", adi_soyadi as \"Adı Soyadı\", tc_no as \"TC Kimlik No\", dogum_tarihi as \"Doğum Tarihi\", ise_giris as \"İşe Giriş Tarihi\", isten_cikis as \"İşten Çıkış Tarihi\", birimi as \"Birimi\", santiye as \"Şantiye Bilgisi\", firma as \"Firma Bilgisi\", durum as \"Giriş/Çıkış Durumu\", calisma_sekli as \"Çalışma Durumu\", fark_gun as \"Çıkış Gün Sayısı\" FROM personel ORDER BY sira_no ASC", conn)
+    df_pt = pd.read_sql_query("SELECT id as \"Kayıt ID\", tarih_satir as \"Tarih_Saat\", santiye as \"Şantiye\", personel_adi as \"Personel_Adi\", tc_no as \"TC_Kimlik\", donem_ay as \"Dönem_Ay\", gun_sayisi as \"Çalışılan_Gün_Sayısı\", giren_sef as \"Giren_Sef\" FROM puantaj ORDER BY id DESC", conn)
     conn.close()
     return df_p, df_pt
 
-df_canli, df_puantaj_canli = verileri_yukle_sql()
+df_canli, df_puantaj_canli = verileri_yukle_bulut()
 YENI_BIRIMLER = [
     "BETONARME DEMİRCİSİ", "İNŞAAT İŞÇİSİ", "KULE VİNÇ OPERATÖRÜ", "AHŞAP KALIPÇI",
     "İNŞAAT MÜHENDİSİ", "ŞANTİYE ŞEFİ", "MUHASABECİ", "MUHASEBE ELEMANI",
@@ -121,11 +117,10 @@ if "giris_yapildi" not in st.session_state:
 try: saved_user = cookie_manager.get(cookie="saved_user")
 except: saved_user = None
 
-if saved_user and not st.session_state["giris_yapildi"]:
-    if saved_user in KULLANICILAR:
-        st.session_state["giris_yapildi"] = True; st.session_state["kullanici"] = saved_user
-        st.session_state["santiye"] = KULLANICILAR[saved_user]["santiye"]
-        st.session_state["firma"] = KULLANICILAR[saved_user]["firma"]; st.session_state["rol"] = KULLANICILAR[saved_user]["rol"]
+if saved_user and not st.session_state["giris_yapildi"] and saved_user in KULLANICILAR:
+    st.session_state["giris_yapildi"] = True; st.session_state["kullanici"] = saved_user
+    st.session_state["santiye"] = KULLANICILAR[saved_user]["santiye"]
+    st.session_state["firma"] = KULLANICILAR[saved_user]["firma"]; st.session_state["rol"] = KULLANICILAR[saved_user]["rol"]
 
 def renk_ayarla(val):
     val_str = str(val).upper()
@@ -152,13 +147,12 @@ def kurumsal_rapor_uret(df_data):
     return csv_string.encode('utf-8-sig')
 
 if not st.session_state["giris_yapildi"]:
-    st.write("")
     col_l1, col_l2, col_l3 = st.columns([1.2, 1, 1.2])
     with col_l2:
         st.markdown("<h3 style='text-align: center; color: #2B6CB0;'>🏛️ PERSONEL TAKİP</h3>", unsafe_allow_html=True)
         beni_hatirla_check = st.checkbox("Beni Hatırla")
         with st.form("login_form"):
-            kullanici_adi = st.text_input("Kullanıcı Adı"); sifre = st.text_input("Şre", type="password")
+            kullanici_adi = st.text_input("Kullanıcı Adı"); sifre = st.text_input("Şifre", type="password")
             if st.form_submit_button("SİSTEME GÜVENLİ GİRİŞ YAP", use_container_width=True):
                 if kullanici_adi in KULLANICILAR and KULLANICILAR[kullanici_adi]["sifre"] == sifre:
                     st.session_state["giris_yapildi"] = True; st.session_state["kullanici"] = kullanici_adi
@@ -190,47 +184,21 @@ else:
         menu_secim = st.sidebar.radio("MENÜ SEÇENEKLERİ", ["🏛️ Merkez Personel Takip", "📅 Aylık Puantajları İzle"])
         df_goster = df_canli.copy(); df_p_goster = df_puantaj_canli.copy()
 
-    bugun_str = datetime.date.today().strftime("%d.%m.%Y")
     df_bekleyen_sayi = df_canli[df_canli["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])] if not df_canli.empty else pd.DataFrame()
 
-    st.markdown("##### 📋 ŞANTİYE CANLI İSTATİSTİK PANELI")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Toplam Aktif Çalışan", len(df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"]) if not df_goster.empty else 0)
-    m2.metric("Toplam Ayrılan Personel", len(df_goster[df_goster["Giriş/Çıkış Durumu"] == "SGK ÇIKIŞI YAPILDI"]) if not df_goster.empty else 0)
-    m3.metric("Bugün Girişi Yapılan", len(df_goster[(df_goster["İşe Giriş Tarihi"] == bugun_str) & (df_goster["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI")]) if not df_goster.empty else 0)
-    m4.metric("Bugün Çıkışı Yapılan", len(df_goster[(df_goster["İşten Çıkış Tarihi"] == bugun_str) & (df_goster["Giriş/Çıkış Durumu"] == "SGK ÇIKIŞI YAPILDI")]) if not df_goster.empty else 0)
-
-    if st.session_state["rol"] in ["merkez", "izleyici"] and not df_canli.empty:
-        with st.expander("🏗️ Tüm Şantiyelerin Canlı Aktif Personel Dağılımı"):
-            s_cols = st.columns(4)
-            santiyeler_listesi = ["CANİK", "GAZİETHEMPAŞA", "OFİS", "TEPECİK ABLOK", "POLATLI", "GİRESUN", "İSTANBUL", "MORFOLOJİ", "YAYLADERE", "MERKZE İŞYERİ-2", "KILIÇDEDE2"]
-            for idx, s_ad in enumerate(santiyeler_listesi):
-                aktif_s = len(df_canli[(df_canli["Şantiye Bilgisi"] == s_ad) & (df_canli["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI")])
-                s_cols[idx % 4].markdown(f"**{s_ad}:** `{aktif_s} Aktif`")
-    st.markdown("---")
-    if st.session_state["rol"] == "merkez" and menu_secim == "🏛️ Merkez Personel Takip":
-        if not df_bekleyen_sayi.empty:
-            with st.expander("🔔 ONAY BEKLEYEN HAREKETLER", expanded=True):
-                bekleyen_listesi = df_bekleyen_sayi.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']} ({r['Şantiye Bilgisi']})", axis=1).tolist()
-                secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
-                if secilen_islem_metni:
-                    parts = str(secilen_islem_metni).split(" | ")
-                    secilen_sira_no = int(parts[0].replace("Sıra No: ", "").strip())
-                    st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;box-shadow: 0 4px 6px -1px rgba(211,47,47,0.3);font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP (E-BİLDİRGE EKRANI)</div></a>', unsafe_allow_html=True)
-                    o1, o2 = st.columns(2)
-
-                    with o1:
-                        mevcut_bekleyen_durum = str(df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values).upper()
-                        if "GİRİŞ" in mevcut_bekleyen_durum:
-                            if st.button("✅ SGK GİRİŞİNE RESMİ ONAY VER", use_container_width=True):
-                                conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
-                                cursor.execute("UPDATE personel SET durum = 'SGK GİRİŞİ YAPILDI' WHERE sira_no = ?", (secilen_sira_no,))
-                                conn.commit(); conn.close(); st.success("Giriş Onaylandı!"); time.sleep(0.5); st.rerun()
-                        elif "ÇIKIŞ" in mevcut_bekleyen_durum:
-                            if st.button("🚫 SGK ÇIKIŞINA RESMİ ONAY VER", use_container_width=True):
-                                conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
-                                cursor.execute("UPDATE personel SET durum = 'SGK ÇIKIŞI YAPILDI' WHERE sira_no = ?", (secilen_sira_no,))
-                                conn.commit(); conn.close(); st.success("Çıkış Onaylandı!"); time.sleep(0.5); st.rerun()
+    if st.session_state["rol"] == "merkez" and menu_secim == "🏛️ Merkez Personel Takip" and not df_bekleyen_sayi.empty:
+        with st.expander("🔔 ONAY BEKLEYEN HAREKETLER", expanded=True):
+            bekleyen_listesi = df_bekleyen_sayi.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']} ({r['Şantiye Bilgisi']})", axis=1).tolist()
+            secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
+            if secilen_islem_metni:
+                secilen_sira_no = int(str(secilen_islem_metni).split(" | ")[0].replace("Sıra No: ", "").strip())
+                st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP</div></a>', unsafe_allow_html=True)
+                if st.button("✅ HAREKETİ BULUTTA RESMİ OLARAK ONAYLA", use_container_width=True):
+                    conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                    mevcut_durum = df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values
+                    yeni_durum = "SGK GİRİŞİ YAPILDI" if "GİRİŞ" in str(mevcut_durum).upper() else "SGK ÇIKIŞI YAPILDI"
+                    cursor.execute("UPDATE personel SET durum = %s WHERE sira_no = %s", (yeni_durum, secilen_sira_no))
+                    conn.commit(); conn.close(); st.success("Bulut Onayı Tamamlandı!"); time.sleep(0.5); st.rerun()
 
     if st.session_state["rol"] == "sube" and menu_secim == "Personel Giriş / Çıkış":
         st.markdown("##### 📥 PERSONEL KART TANIMLAMA")
@@ -242,14 +210,12 @@ else:
             p_guncelle_listesi = df_guncellenebilir_havuz.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
             secilen_g_p = st.selectbox("Personel Seçin", p_guncelle_listesi)
             if secilen_g_p:
-                match_g_sira = re.search(r"Sıra No:\s*(\d+)", str(secilen_g_p))
-                if match_g_sira:
-                    g_sira_no = int(match_g_sira.group(1))
-                    filtered_df = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"].astype(str) == str(g_sira_no)]
-                    if not filtered_df.empty:
-                        p_satir = filtered_df.iloc[0]
-                        varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
-                        varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir["Çıkış Gün Sayısı"])
+                g_sira_no = int(str(secilen_g_p).split(" | ")[0].replace("Sıra No: ", "").strip())
+                filtered_df = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"] == g_sira_no]
+                if not filtered_df.empty:
+                    p_satir = filtered_df.iloc[0]
+                    varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
+                    varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir["Çıkış Gün Sayısı"])
         
         with st.form("excel_birebir_form", clear_on_submit=True):
             f_col1, f_col2, f_col3 = st.columns(3)
@@ -268,34 +234,17 @@ else:
             with f_sub_col2: p_durum = st.selectbox("DURUMU", ["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"], index=1 if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" else 0)
             with f_sub_col3: p_fark_gun_elle = st.text_input("ÇIKIŞ GÜN SAYISI", value=varsayilan_fark)
             
-            st.text_input("FİRMA BİLGİSİ", value=st.session_state["firma"], disabled=True)
-            
-            if st.form_submit_button("💾 VERİYİ OTOMATİK VERİTABANINA İŞLE", use_container_width=True):
+            if st.form_submit_button("💾 VERİYİ BULUT VERİTABANINA KALICI OLARAK İŞLE", use_container_width=True):
                 if p_adi.strip() != "" and p_tc.strip() != "":
-                    conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
+                    conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
                     if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and varsayilan_sira is not None:
-                        cursor.execute("DELETE FROM personel WHERE sira_no = ?", (varsayilan_sira,))
-                        sira_no = varsayilan_sira
-                    else:
-                        cursor.execute("SELECT MAX(sira_no) FROM personel")
-                        row_val = cursor.fetchone()
-                        sira_no = int(row_val[0]) + 1 if row_val and row_val[0] is not None else 1
-                    
-                    cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(sira_no), p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
-                    conn.commit(); conn.close(); st.success("✔️ Başarıyla işlendi!"); time.sleep(0.5); st.rerun()
-                else: st.error("❌ İsim ve TC boş geçilemez!")
-        st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-top:10px;margin-bottom:20px;box-shadow: 0 4px 6px -1px rgba(211,47,47,0.3); font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP (E-BİLDİRGE EKRANI)</div></a>', unsafe_allow_html=True)
+                        cursor.execute("DELETE FROM personel WHERE sira_no = %s", (varsayilan_sira,))
+                    cursor.execute("INSERT INTO personel (adi_soyadi, tc_no, dogum_tarihi, ise_giris, isten_cikis, birimi, santiye, firma, durum, calisma_sekli, fark_gun) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
+                    conn.commit(); conn.close(); st.success("✔️ Kalıcı Olarak Buluta İşlendi!"); time.sleep(0.5); st.rerun()
         st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
-        df_goster_sirali = df_goster.sort_values(by="Sıra No", ascending=True) if not df_goster.empty else df_goster
-        if not df_goster_sirali.empty:
-            try: st.dataframe(df_goster_sirali.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
-            except AttributeError: st.dataframe(df_goster_sirali.style.applymap(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
-                
-            r_col1, r_col2 = st.columns(2)
-            with r_col1: st.download_button(label="📥 BU LİSTEYİ EXCEL RAPORU YAP (12 SÜTUN TAM)", data=kurumsal_rapor_uret(df_goster_sirali), file_name="santiye_personel_raporu.csv", mime="text/csv", use_container_width=True)
-            with r_col2:
-                if st.button("🖨️ BU LİSTEYİ RESMİ PDF YAP / YAZDIR", use_container_width=True): st.markdown("<script>window.print();</script>", unsafe_allow_html=True)
-        else: st.info("💡 Kayıtlı personel bulunmuyor.")
+        if not df_goster.empty:
+            try: st.dataframe(df_goster.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
+            except: st.dataframe(df_goster.style.applymap(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
 
         df_sube_silinebilir = df_goster[df_goster["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"])] if not df_goster.empty else pd.DataFrame()
         if not df_sube_silinebilir.empty:
@@ -303,11 +252,10 @@ else:
             p_silme_listesi_sube = df_sube_silinebilir.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
             secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
             if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
-                parts_sil = str(secilen_sil_p_sube).split(" | ")
-                s_sira = int(parts_sil[0].replace("Sıra No: ", "").strip())
-                conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
-                cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
-                conn.commit(); conn.close(); st.success("Beklemedeki personel kartı silindi!"); st.rerun()
+                s_sira = int(str(secilen_sil_p_sube).split(" | ")[0].replace("Sıra No: ", "").strip())
+                conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                cursor.execute("DELETE FROM personel WHERE sira_no = %s", (s_sira,))
+                conn.commit(); conn.close(); st.success("Kayıt buluttan silindi!"); st.rerun()
 
     elif st.session_state["rol"] == "sube" and menu_secim == "Aylık Puantaj Girişi":
         st.markdown("### 📅 ŞANTİYE AYLIK PUANTAJ GİRİŞ EKRANI")
@@ -323,62 +271,43 @@ else:
                     calisilan_gun = st.number_input("Çalışılan Gün Sayısı", min_value=0, max_value=31, value=26)
                     sefi_adi = st.text_input("Giriş Yapan Yetkili")
                     if st.form_submit_button("💾 PUANTAJI MERKEZE GÖNDER", use_container_width=True):
-                        p_str = str(secilen_p); p_str_parts = p_str.split(" (")
-                        p_ad_parca = p_str_parts[0].strip(); p_tc_parca = p_str_parts[1].replace(")", "").strip()
+                        p_ad_parca = str(secilen_p).split(" (")[0].strip()
+                        p_tc_parca = str(secilen_p).split(" (")[1].replace(")", "").strip()
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
-                        cursor.execute("DELETE FROM puantaj WHERE tc_no = ? AND donem_ay = ? AND santiye = ?", (p_tc_parca, donem_ay, st.session_state["santiye"]))
-                        cursor.execute("INSERT INTO puantaj (tarih_satir, santiye, personel_adi, tc_no, donem_ay, gun_sayisi, giren_sef) VALUES (?, ?, ?, ?, ?, ?, ?)", (su_an_p, str(st.session_state["santiye"]), str(p_ad_parca), str(p_tc_parca), str(donem_ay), int(calisilan_gun), sefi_adi.upper()))
-                        conn.commit(); conn.close(); st.success("✔️ Puantaj Kilitlendi!"); time.sleep(0.5); st.rerun()
+                        conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                        cursor.execute("DELETE FROM puantaj WHERE tc_no = %s AND donem_ay = %s AND santiye = %s", (p_tc_parca, donem_ay, st.session_state["santiye"]))
+                        cursor.execute("INSERT INTO puantaj (tarih_satir, santiye, personel_adi, tc_no, donem_ay, gun_sayisi, giren_sef) VALUES (%s, %s, %s, %s, %s, %s, %s)", (su_an_p, str(st.session_state["santiye"]), str(p_ad_parca), str(p_tc_parca), str(donem_ay), int(calisilan_gun), sefi_adi.upper()))
+                        conn.commit(); conn.close(); st.success("✔️ Buluta Kilitlendi!"); time.sleep(0.5); st.rerun()
         with col_p2:
-            st.dataframe(df_p_goster.iloc[::-1] if not df_p_goster.empty else df_p_goster, use_container_width=True, hide_index=True)
+            st.dataframe(df_p_goster, use_container_width=True, hide_index=True)
             if not df_p_goster.empty:
                 p_silme_listesi = df_p_goster.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']}", axis=1).tolist()
                 secilen_p_sil_id = st.selectbox("Hatalı Kaydı Seçin", p_silme_listesi)
-                if st.button("❌ SEÇİLİ PUANTAJI LİSTEDEN SİL", use_container_width=True):
-                    parts_p_sil = str(secilen_p_sil_id).split(" | ")
-                    sil_id = int(parts_p_sil[0].replace("ID: ", "").strip())
-                    conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
-                    cursor.execute("DELETE FROM puantaj WHERE id = ?", (sil_id,))
-                    conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
-    if st.session_state["rol"] in ["merkez", "izleyici"]:
+                if st.button("❌ SEÇİLİ PUANTAJI BULUTTAN SİL", use_container_width=True):
+                    sil_id = int(str(secilen_p_sil_id).split(" | ")[0].replace("ID: ", "").strip())
+                    conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                    cursor.execute("DELETE FROM puantaj WHERE id = %s", (sil_id,))
+                    conn.commit(); conn.close(); st.success("Buluttan Silindi!"); time.sleep(0.5); st.rerun()
+    elif st.session_state["rol"] in ["merkez", "izleyici"]:
         tab1, tab2 = st.tabs(["👥 CANLI MASTER PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI"])
         with tab1:
-            with st.expander("📥 EXCEL / CSV DOSYASINDAN TOPLU PERSONEL AKTARIMI (MERKEZ ÖZEL)"):
-                st.info("💡 Sütunlar: 'Sıra No', 'Adı Soyadı', 'TC Kimlik No', 'Doğum Tarihi', 'İşe Giriş Tarihi', 'İşten Çıkış Tarihi', 'Birimi', 'Şantiye Bilgisi', 'Firma Bilgisi', 'Giriş/Çıkış Durumu', 'Çalışma Durumu', 'Çıkış Gün Sayısı'")
+            with st.expander("📥 EXCEL / CSV DOSYASINDAN TOPLU PERSONEL AKTARIMI (MERKEZ ÖZCE)"):
+                st.info("💡 Sütunlar: 'Adı Soyadı', 'TC Kimlik No', 'Doğum Tarihi', 'İşe Giriş Tarihi', 'İşten Çıkış Tarihi', 'Birimi', 'Şantiye Bilgisi', 'Firma Bilgisi', 'Giriş/Çıkış Durumu', 'Çalışma Durumu', 'Çıkış Gün Sayısı'")
                 yuklenen_dosya = st.file_uploader("Personel Excel Listesini Seçin", type=["xlsx", "xls", "csv"])
                 if yuklenen_dosya is not None:
                     try:
                         if yuklenen_dosya.name.endswith('.csv'):
-                            try:
-                                yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='utf-8')
-                            except UnicodeDecodeError:
-                                try: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='iso-8859-9')
-                                except UnicodeDecodeError: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='cp1254')
-                            
-                            # 🔥 TUPLE KIYASLAMA HATASINI KÖKTEN ÇÖZEN SHAPE-SATIR KONTROLÜ
-                            if not df_toplu.empty and df_toplu.shape[0] <= 1:
-                                try: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='utf-8')
-                                except UnicodeDecodeError:
-                                    try: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='iso-8859-9')
-                                    except UnicodeDecodeError: yuklenen_dosya.seek(0); df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='cp1254')
+                            try: df_toplu = pd.read_csv(yuklenen_dosya, sep=';', dtype=str, encoding='utf-8')
+                            except: df_toplu = pd.read_csv(yuklenen_dosya, sep=',', dtype=str, encoding='utf-8')
                         else: df_toplu = pd.read_excel(yuklenen_dosya, dtype=str)
-                        gerekli_sutunlar = ["Sıra No", "Adı Soyadı", "TC Kimlik No", "Doğum Tarihi", "İşe Giriş Tarihi", "İşten Çıkış Tarihi", "Birimi", "Şantiye Bilgisi", "Firma Bilgisi", "Giriş/Çıkış Durumu", "Çalışma Durumu", "Çıkış Gün Sayısı"]
-                        eksik_sutunlar = [col for col in gerekli_sutunlar if col not in df_toplu.columns]
-                        if eksik_sutunlar: st.error(f"❌ Eksik başlıklar: {eksik_sutunlar}")
-                        else:
-                            st.dataframe(df_toplu.head(5), use_container_width=True)
-                            if st.button("🚀 TOPLU VERİYİ VERİTABANINA AKTAR", use_container_width=True):
-                                conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor(); aktarilan_adet = 0
-                                for _, r in df_toplu.iterrows():
-                                    if pd.isna(r["Adı Soyadı"]) or pd.isna(r["TC Kimlik No"]): continue
-                                    cursor.execute("SELECT MAX(sira_no) FROM personel")
-                                    max_row = cursor.fetchone()
-                                    # 🔥 TOPLU AKTARIMDA DA SIRA NO ALIRKEN TUPLE ÇÖKMESİNİ ENGELLEYEN DEFANS
-                                    yeni_sira = int(max_row[0]) + 1 if max_row and max_row[0] is not None else 1
-                                    cursor.execute("INSERT INTO personel VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (int(yeni_sira), str(r["Adı Soyadı"]).strip().upper(), str(r["TC Kimlik No"]).strip(), str(r["Doğum Tarihi"]), str(r["İşe Giriş Tarihi"]), str(r["İşten Çıkış Tarihi"]), str(r["Birimi"]), str(r["Şantiye Bilgisi"]), str(r["Firma Bilgisi"]), str(r["Giriş/Çıkış Durumu"]), str(r["Çalışma Durumu"]), str(r["Çıkış Gün Sayısı"])))
-                                    aktarilan_adet += 1
-                                conn.commit(); conn.close(); st.success(f"✔️ {aktarilan_adet} adet başarıyla işlendi!"); time.sleep(0.5); st.rerun()
+                        st.dataframe(df_toplu.head(5), use_container_width=True)
+                        if st.button("🚀 TÜM LİSTEYİ BULUT VERİTABANINA AKTAR", use_container_width=True):
+                            conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor(); aktarilan = 0
+                            for _, r in df_toplu.iterrows():
+                                if pd.isna(r["Adı Soyadı"]) or pd.isna(r["TC Kimlik No"]): continue
+                                cursor.execute("INSERT INTO personel (adi_soyadi, tc_no, dogum_tarihi, ise_giris, isten_cikis, birimi, santiye, firma, durum, calisma_sekli, fark_gun) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (str(r["Adı Soyadı"]).strip().upper(), str(r["TC Kimlik No"]).strip(), str(r["Doğum Tarihi"]), str(r["İşe Giriş Tarihi"]), str(r["İşten Çıkış Tarihi"]), str(r["Birimi"]), str(r["Şantiye Bilgisi"]), str(r["Firma Bilgisi"]), str(r["Giriş/Çıkış Durumu"]), str(r["Çalışma Durumu"]), str(r["Çıkış Gün Sayısı"])))
+                                aktarilan += 1
+                            conn.commit(); conn.close(); st.success(f"✔️ {aktarilan} Personel Buluta Kilitlendi!"); time.sleep(0.5); st.rerun()
                     except Exception as ex: st.error(f"❌ Hata: {ex}")
 
             f_col1, f_col2 = st.columns(2)
@@ -387,19 +316,19 @@ else:
             df_merkez_p_filtreli = df_canli.copy()
             if secilen_f_santiye != "HEPSİ": df_merkez_p_filtreli = df_merkez_p_filtreli[df_merkez_p_filtreli["Şantiye Bilgisi"] == secilen_f_santiye]
             if secilen_f_durum != "HEPSİ": df_merkez_p_filtreli = df_merkez_p_filtreli[df_merkez_p_filtreli["Giriş/Çıkış Durumu"] == secilen_f_durum]
-            df_merkez_p_filtreli = df_merkez_p_filtreli.sort_values(by="Sıra No", ascending=True) if not df_merkez_p_filtreli.empty else df_merkez_p_filtreli
-            try: st.dataframe(df_merkez_p_filtreli.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
-            except AttributeError: st.dataframe(df_merkez_p_filtreli.style.applymap(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
-            st.download_button(label="📥 MASTER EXCEL RAPORU İNDİR (12 SÜTUN TAM)", data=kurumsal_rapor_uret(df_merkez_p_filtreli), file_name="master_personel.csv", mime="text/csv", use_container_width=True)
-            if st.session_state["rol"] == "merkez" and not df_merkez_p_filtreli.empty:
-                m_p_sil_list = df_merkez_p_filtreli.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
-                m_secilen_sil = st.selectbox("MASTER SİLME: Personel Seçin", m_p_sil_list)
-                if st.button("🔥 SEÇİLİ PERSONELİ VERİTABANINA KALICI OLARAK SİL", use_container_width=True):
-                    parts_m_sil = str(m_secilen_sil).split(" | ")
-                    m_sil_sira = int(parts_m_sil[0].replace("Sıra No: ", "").strip())
-                    conn = sqlite3.connect(DB_YOLU); cursor = conn.cursor()
-                    cursor.execute("DELETE FROM personel WHERE sira_no = ?", (m_sil_sira,))
-                    conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
+            
+            if not df_merkez_p_filtreli.empty:
+                try: st.dataframe(df_merkez_p_filtreli.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
+                except: st.dataframe(df_merkez_p_filtreli.style.applymap(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
+                
+                if st.session_state["rol"] == "merkez":
+                    m_p_sil_list = df_merkez_p_filtreli.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
+                    m_secilen_sil = st.selectbox("MASTER BULUTTAN SİL: Personel Seçin", m_p_sil_list)
+                    if st.button("🔥 SEÇİLİ PERSONELİ BULUTTAN KALICI OLARAK SİL", use_container_width=True):
+                        m_sil_sira = int(str(m_secilen_sil).split(" | ")[0].replace("Sıra No: ", "").strip())
+                        conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                        cursor.execute("DELETE FROM personel WHERE sira_no = %s", (m_sil_sira,))
+                        conn.commit(); conn.close(); st.success("Buluttan tamamen yok edildi!"); time.sleep(0.5); st.rerun()
         with tab2:
             fp_col1, fp_col2 = st.columns(2)
             with fp_col1: secilen_fp_santiye = st.selectbox("Puantaj Şantiye Seçimi", ["HEPSİ", "CANİK", "GAZİETHEMPAŞA", "OFİS", "TEPECİK ABLOK", "POLATLI", "GİRESUN", "İSTANBUL", "MORFOLOJİ", "YAYLADERE", "MERKZE İŞYERİ-2", "KILIÇDEDE2"])
@@ -407,6 +336,6 @@ else:
             df_merkez_pt_filtreli = df_puantaj_canli.copy()
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
-            st.dataframe(df_merkez_pt_filtreli.iloc[::-1], use_container_width=True, hide_index=True)
+            st.dataframe(df_merkez_pt_filtreli, use_container_width=True, hide_index=True)
 
 
