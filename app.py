@@ -9,7 +9,7 @@ from psycopg2 import extras
 import re
 import extra_streamlit_components as stx
 
-# Sayfa Ayarları - %100 Tam Ekran and Sola-Sağa Sıfır Boşluk Nizamı
+# Sayfa Ayarları - %100 Tam Ekran ve Sola-Sağa Sıfır Boşluk Nizamı
 st.set_page_config(page_title="PERSONEL TAKİP", layout="wide")
 
 st.markdown("""
@@ -59,11 +59,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 def baglanti_adresi_hazirla():
-    # Streamlit Secrets alanından adresi çeken kurşun geçirmez anahtar
-    adres = st.secrets["database"]["baglanti"]
-    # 🛠️ Güvenlik duvarını yıkan akıllı port 5432 tamir yama motoru
+    # Secrets alanındaki adresi alıp dışındaki sinsi tırnakları ayıklayan zırh
+    adres = str(st.secrets["database"]["baglanti"]).strip().strip('"').strip("'")
+    # Havuz kilidini kıran port 5432 revizyonu
     if ":6543" in adres:
         adres = adres.replace(":6543", ":5432")
+    # SSL parametresini güvenli kilitli ekleyen motor
     if "sslmode=" not in adres:
         adres = adres + ("&" if "?" in adres else "?") + "sslmode=require"
     return adres
