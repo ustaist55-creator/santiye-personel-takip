@@ -9,13 +9,11 @@ from psycopg2 import extras
 import re
 import extra_streamlit_components as stx
 
-# Sayfa Ayarları - %100 Tam Ekran ve Sola-Sağa Sıfır Boşluk Nizamı
 st.set_page_config(page_title="PERSONEL TAKİP", layout="wide")
 
 st.markdown("""
 <style>
-    /* 🔒 GÜVENLİK VE MAKSİMUM GÖRÜNÜRLÜK YAMASI */
-    header, footer, .stDeployButton, [data-testid="stToolbar"], #MainMenu {
+    header, footer, .stDeployButton, [data-testid JagToolbar"], #MainMenu {
         display: none !important;
         visibility: hidden !important;
     }
@@ -23,7 +21,6 @@ st.markdown("""
         display: none !important;
         visibility: hidden !important;
     }
-    /* 📺 MADDE 1: EKRANA TAM SIĞDIRMA VE GENİŞLİK CSS ZIRHI */
     .block-container {
         max-width: 100% !important;
         padding-left: 20px !important;
@@ -31,7 +28,6 @@ st.markdown("""
         padding-top: 15px !important;
         padding-bottom: 15px !important;
     }
-    /* 📱 TELEFON / MOBİL UYUM YAMASI */
     @media (max-width: 768px) {
         .stSidebar { min-width: 100% !important; max-width: 100% !important; }
         div[data-testid="stForm"] { padding: 15px !important; }
@@ -58,7 +54,6 @@ st.markdown("""
     .stButton>button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.3) !important; }
 </style>
 """, unsafe_allow_html=True)
-# 🔥 ADRES ATAMA HATASINI SIFIRLAYAN GERÇEK SUPABASE PARAMETRELERİ
 DB_PARAMETRELERI = {
     "host": "://supabase.com",
     "port": 6543,
@@ -287,8 +282,8 @@ else:
                     if st.form_submit_button("💾 PUANTAJI MERKEZE GÖNDER", use_container_width=True):
                         p_str = str(secilen_p)
                         p_str_parts = p_str.split(" (")
-                        p_ad_parca = p_str_parts.strip()
-                        p_tc_parca = p_str_parts.replace(")", "").strip()
+                        p_ad_parca = p_str_parts[0].strip()
+                        p_tc_parca = p_str_parts[1].replace(")", "").strip()
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         conn = bulut_baglanti_al(); cursor = conn.cursor()
                         cursor.execute("DELETE FROM puantaj WHERE tc_no = %s AND donem_ay = %s AND santiye = %s", (p_tc_parca, donem_ay, st.session_state["santiye"]))
