@@ -3,3 +3,4 @@ pandas
 extra_streamlit_components
 st-gsheets-connection
 psycopg2-binary
+openpyxl
