@@ -58,15 +58,20 @@ st.markdown("""
     .stButton>button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.3) !important; }
 </style>
 """, unsafe_allow_html=True)
-# BULUT VERİTABANI BAĞLANTI AYARI - GÜVENLİ VE DOĞRUDAN IP KİLİTLİ
+# BULUT VERİTABANI BAĞLANTI AYARI
 DB_CONN_STR = st.secrets["database"]["baglanti"]
 
+def baglanti_adresi_hazirla():
+    # 🛠️ Güvenlik duvarını yıkan akıllı port 5432 tamir yama motoru
+    adres = DB_CONN_STR
+    if ":6543" in adres:
+        adres = adres.replace(":6543", ":5432")
+    if "sslmode=" not in adres:
+        adres = adres + ("&" if "?" in adres else "?") + "sslmode=require"
+    return adres
+
 def bulut_altyapi_kur():
-    if "?" not in DB_CONN_STR:
-        baglanti_adresi = DB_CONN_STR + "?sslmode=require"
-    else:
-        baglanti_adresi = DB_CONN_STR + "&sslmode=require"
-        
+    baglanti_adresi = baglanti_adresi_hazirla()
     conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS personel (
@@ -86,11 +91,7 @@ def bulut_altyapi_kur():
 bulut_altyapi_kur()
 
 def verileri_yukle_bulut():
-    if "?" not in DB_CONN_STR:
-        baglanti_adresi = DB_CONN_STR + "?sslmode=require"
-    else:
-        baglanti_adresi = DB_CONN_STR + "&sslmode=require"
-        
+    baglanti_adresi = baglanti_adresi_hazirla()
     conn = psycopg2.connect(baglanti_adresi)
     df_p = pd.read_sql_query("SELECT sira_no as \"Sıra No\", adi_soyadi as \"Adı Soyadı\", tc_no as \"TC Kimlik No\", dogum_tarihi as \"Doğum Tarihi\", ise_giris as \"İşe Giriş Tarihi\", isten_cikis as \"İşten Çıkış Tarihi\", birimi as \"Birimi\", santiye as \"Şantiye Bilgisi\", firma as \"Firma Bilgisi\", durum as \"Giriş/Çıkış Durumu\", calisma_sekli as \"Çalışma Durumu\", fark_gun as \"Çıkış Gün Sayısı\" FROM personel ORDER BY sira_no ASC", conn)
     df_pt = pd.read_sql_query("SELECT id as \"Kayıt ID\", tarih_satir as \"Tarih_Saat\", santiye as \"Şantiye\", personel_adi as \"Personel_Adi\", tc_no as \"TC_Kimlik\", donem_ay as \"Dönem_Ay\", gun_sayisi as \"Çalışılan_Gün_Sayısı\", giren_sef as \"Giren_Sef\" FROM puantaj ORDER BY id DESC", conn)
@@ -204,7 +205,7 @@ else:
                 secilen_sira_no = int(str(secilen_islem_metni).split(" | ")[0].replace("Sıra No: ", "").strip())
                 st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP</div></a>', unsafe_allow_html=True)
                 if st.button("✅ HAREKETİ BULUTTA RESMİ OLARAK ONAYLA", use_container_width=True):
-                    baglanti_adresi = DB_CONN_STR + ("?sslmode=require" if "?" not in DB_CONN_STR else "&sslmode=require")
+                    baglanti_adresi = baglanti_adresi_hazirla()
                     conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                     mevcut_durum = df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values
                     yeni_durum = "SGK GİRİŞİ YAPILDI" if "GİRİŞ" in str(mevcut_durum).upper() else "SGK ÇIKIŞI YAPILDI"
@@ -247,7 +248,7 @@ else:
             
             if st.form_submit_button("💾 VERİYİ BULUT VERİTABANINA KALICI OLARAK İŞLE", use_container_width=True):
                 if p_adi.strip() != "" and p_tc.strip() != "":
-                    baglanti_adresi = DB_CONN_STR + ("?sslmode=require" if "?" not in DB_CONN_STR else "&sslmode=require")
+                    baglanti_adresi = baglanti_adresi_hazirla()
                     conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                     if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and varsayilan_sira is not None:
                         cursor.execute("DELETE FROM personel WHERE sira_no = %s", (varsayilan_sira,))
@@ -265,7 +266,7 @@ else:
             secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
             if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
                 s_sira = int(str(secilen_sil_p_sube).split(" | ")[0].replace("Sıra No: ", "").strip())
-                baglanti_adresi = DB_CONN_STR + ("?sslmode=require" if "?" not in DB_CONN_STR else "&sslmode=require")
+                baglanti_adresi = baglanti_adresi_hazirla()
                 conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                 cursor.execute("DELETE FROM personel WHERE sira_no = %s", (s_sira,))
                 conn.commit(); conn.close(); st.success("Kayıt buluttan silindi!"); st.rerun()
@@ -289,7 +290,7 @@ else:
                         p_ad_parca = p_str_parts[0].strip()
                         p_tc_parca = p_str_parts[1].replace(")", "").strip()
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        baglanti_adresi = DB_CONN_STR + ("?sslmode=require" if "?" not in DB_CONN_STR else "&sslmode=require")
+                        baglanti_adresi = baglanti_adresi_hazirla()
                         conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                         cursor.execute("DELETE FROM puantaj WHERE tc_no = %s AND donem_ay = %s AND santiye = %s", (p_tc_parca, donem_ay, st.session_state["santiye"]))
                         cursor.execute("INSERT INTO puantaj (tarih_satir, santiye, personel_adi, tc_no, donem_ay, gun_sayisi, giren_sef) VALUES (%s, %s, %s, %s, %s, %s, %s)", (su_an_p, str(st.session_state["santiye"]), str(p_ad_parca), str(p_tc_parca), str(donem_ay), int(calisilan_gun), sefi_adi.upper()))
@@ -301,7 +302,7 @@ else:
                 secilen_p_sil_id = st.selectbox("Hatalı Kaydı Seçin", p_silme_listesi)
                 if st.button("❌ SEÇİLİ PUANTAJI BULUTTAN SİL", use_container_width=True):
                     sil_id = int(str(secilen_p_sil_id).split(" | ")[0].replace("ID: ", "").strip())
-                    baglanti_adresi = DB_CONN_STR + ("?sslmode=require" if "?" not in DB_CONN_STR else "&sslmode=require")
+                    baglanti_adresi = baglanti_adresi_hazirla()
                     conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = %s", (sil_id,))
                     conn.commit(); conn.close(); st.success("Buluttan Silindi!"); time.sleep(0.5); st.rerun()
@@ -319,7 +320,7 @@ else:
                         else: df_toplu = pd.read_excel(yuklenen_dosya, dtype=str)
                         st.dataframe(df_toplu.head(5), use_container_width=True)
                         if st.button("🚀 TÜM LİSTEYİ BULUT VERİTABANINA AKTAR", use_container_width=True):
-                            baglanti_adresi = DB_CONN_STR + ("?sslmode=require" if "?" not in DB_CONN_STR else "&sslmode=require")
+                            baglanti_adresi = baglanti_adresi_hazirla()
                             conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor(); aktarilan = 0
                             for _, r in df_toplu.iterrows():
                                 if pd.isna(r["Adı Soyadı"]) or pd.isna(r["TC Kimlik No"]): continue
@@ -344,7 +345,7 @@ else:
                     m_secilen_sil = st.selectbox("MASTER BULUTTAN SİL: Personel Seçin", m_p_sil_list)
                     if st.button("🔥 SEÇİLİ PERSONELİ BULUTTAN KALICI OLARAK SİL", use_container_width=True):
                         m_sil_sira = int(str(m_secilen_sil).split(" | ")[0].replace("Sıra No: ", "").strip())
-                        baglanti_adresi = DB_CONN_STR + ("?sslmode=require" if "?" not in DB_CONN_STR else "&sslmode=require")
+                        baglanti_adresi = baglanti_adresi_hazirla()
                         conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                         cursor.execute("DELETE FROM personel WHERE sira_no = %s", (m_sil_sira,))
                         conn.commit(); conn.close(); st.success("Buluttan tamamen yok edildi!"); time.sleep(0.5); st.rerun()
