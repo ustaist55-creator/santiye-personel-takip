@@ -61,7 +61,7 @@ st.markdown("""
 def baglanti_adresi_hazirla():
     # Secrets alanındaki adresi alıp dışındaki sinsi tırnakları ayıklayan zırh
     adres = str(st.secrets["database"]["baglanti"]).strip().strip('"').strip("'")
-    # 🛠️ Supavisor bağlantı havuzunu aktif eden port 6543 geri yükleme motoru
+    # Supavisor bağlantı havuzunu aktif eden port 6543 geri yükleme motoru
     if ":5432" in adres:
         adres = adres.replace(":5432", ":6543")
     # SSL parametresini güvenli kilitli ekleyen motor
@@ -87,7 +87,12 @@ def bulut_altyapi_kur():
     """)
     conn.commit(); conn.close()
 
-bulut_altyapi_kur()
+# Uygulama uyanırken veritabanını şak diye kontrol eden tetikleyici
+try:
+    bulut_altyapi_kur()
+except Exception as e:
+    st.error(f"Bulut veritabanına erişim sağlanamadı. Lütfen Supabase IP iznini kontrol edin. Detay: {e}")
+    st.stop()
 
 def verileri_yukle_bulut():
     baglanti_adresi = baglanti_adresi_hazirla()
@@ -241,7 +246,7 @@ else:
                 p_calisma = st.selectbox("ÇALIŞMA DURUMU", ["NORMAL", "EMEKLİ"])
             
             f_sub_col1, f_sub_col2, f_sub_col3 = st.columns(3)
-            with f_sub_col1: p_isten_cikis = tarih_formatla(st.text_input("İŞTEN ÇIKIŞ TARİHİ", value=varsayilan_cikis))
+            with f_sub_col1: p_isten_cikis = tarih_formatla(st.text_input("İŞTEN ÇIKIŞ TRAİHİ", value=varsayilan_cikis))
             with f_sub_col2: p_durum = st.selectbox("DURUMU", ["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"], index=1 if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" else 0)
             with f_sub_col3: p_fark_gun_elle = st.text_input("ÇIKIŞ GÜN SAYISI", value=varsayilan_fark)
             
@@ -356,6 +361,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli, use_container_width=True, hide_index=True)
+
 
 
 
