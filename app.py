@@ -59,12 +59,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 def baglanti_adresi_hazirla():
-    # Secrets alanındaki adresi alıp dışındaki sinsi tırnakları ayıklayan zırh
-    adres = str(st.secrets["database"]["baglanti"]).strip().strip('"').strip("'")
-    # Supavisor bağlantı havuzunu aktif eden port 6543 geri yükleme motoru
+    # 🛠️ Soket hatasını ve tırnak karmaşasını şak diye bitiren saf okuma zırhı
+    raw_adres = st.secrets["database"]["baglanti"]
+    adres = "".join(str(raw_adres).split()).strip('"').strip("'")
+    
     if ":5432" in adres:
         adres = adres.replace(":5432", ":6543")
-    # SSL parametresini güvenli kilitli ekleyen motor
+        
     if "sslmode=" not in adres:
         adres = adres + ("&" if "?" in adres else "?") + "sslmode=require"
     return adres
@@ -87,7 +88,6 @@ def bulut_altyapi_kur():
     """)
     conn.commit(); conn.close()
 
-# Uygulama uyanırken veritabanını şak diye kontrol eden tetikleyici
 try:
     bulut_altyapi_kur()
 except Exception as e:
@@ -246,7 +246,7 @@ else:
                 p_calisma = st.selectbox("ÇALIŞMA DURUMU", ["NORMAL", "EMEKLİ"])
             
             f_sub_col1, f_sub_col2, f_sub_col3 = st.columns(3)
-            with f_sub_col1: p_isten_cikis = tarih_formatla(st.text_input("İŞTEN ÇIKIŞ TRAİHİ", value=varsayilan_cikis))
+            with f_sub_col1: p_isten_cikis = tarih_formatla(st.text_input("İŞTEN ÇIKİŞ TARİHİ", value=varsayilan_cikis))
             with f_sub_col2: p_durum = st.selectbox("DURUMU", ["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"], index=1 if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" else 0)
             with f_sub_col3: p_fark_gun_elle = st.text_input("ÇIKIŞ GÜN SAYISI", value=varsayilan_fark)
             
@@ -309,7 +309,7 @@ else:
                     baglanti_adresi = baglanti_adresi_hazirla()
                     conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = %s", (sil_id,))
-                    conn.commit(); conn.close(); st.success("Buluttan Silindi!"); time.sleep(0.5); st.rerun()
+                    conn.commit(); conn.close(); st.success("Buluttan Silindi!"); time.sleep(0.5); r.rerun()
     elif st.session_state["rol"] in ["merkez", "izleyici"]:
         tab1, tab2 = st.tabs(["👥 CANLI MASTER PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI"])
         with tab1:
