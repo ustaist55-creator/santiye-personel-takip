@@ -54,11 +54,16 @@ st.markdown("""
     .stButton>button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.3) !important; }
 </style>
 """, unsafe_allow_html=True)
-# 🔥 LOKAL ARAMAYI ENGELEYEN VE %100 İNTERNETE ÇIKAN SAF ADRES METNİ
-SAF_BULUT_URI = "postgresql://postgres.pgxthobqecxncgzhfrov:Faruk.2012%2B%2A@://supabase.com"
-
 def bulut_baglanti_al():
-    return psycopg2.connect(SAF_BULUT_URI)
+    # 🛠️ Lokal soket hatasını %100 engelleyen ayrıştırılmış parametre nizamı
+    return psycopg2.connect(
+        host="://supabase.com",
+        port=6543,
+        database="postgres",
+        user="postgres.pgxthobqecxncgzhfrov",
+        password="Faruk.2012+*",
+        sslmode="require"
+    )
 
 def bulut_altyapi_kur():
     conn = bulut_baglanti_al(); cursor = conn.cursor()
@@ -216,7 +221,7 @@ else:
                 g_sira_no = int(str(secilen_g_p).split(" | ").replace("Sıra No: ", "").strip())
                 filtered_df = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"] == g_sira_no]
                 if not filtered_df.empty:
-                    p_satir = filtered_df.iloc[0]
+                    p_satir = filtered_df.iloc
                     varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                     varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir["Çıkış Gün Sayısı"])
         
@@ -289,7 +294,7 @@ else:
                 p_silme_listesi = df_p_goster.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']}", axis=1).tolist()
                 secilen_p_sil_id = st.selectbox("Hatalı Kaydı Seçin", p_silme_listesi)
                 if st.button("❌ SEÇİLİ PUANTAJI BULUTTAN SİL", use_container_width=True):
-                    sil_id = int(str(secilen_p_sil_id).split(" | ")[0].replace("ID: ", "").strip())
+                    sil_id = int(str(secilen_p_sil_id).split(" | ").replace("ID: ", "").strip())
                     conn = bulut_baglanti_al(); cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = %s", (sil_id,))
                     conn.commit(); conn.close(); st.success("Buluttan Silindi!"); time.sleep(0.5); st.rerun()
@@ -330,7 +335,7 @@ else:
                     m_p_sil_list = df_merkez_p_filtreli.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                     m_secilen_sil = st.selectbox("MASTER BULUTTAN SİL: Personel Seçin", m_p_sil_list)
                     if st.button("🔥 SEÇİLİ PERSONELİ BULUTTAN KALICI OLARAK SİL", use_container_width=True):
-                        m_sil_sira = int(str(m_secilen_sil).split(" | ")[0].replace("Sıra No: ", "").strip())
+                        m_sil_sira = int(str(m_secilen_sil).split(" | ").replace("Sıra No: ", "").strip())
                         conn = bulut_baglanti_al(); cursor = conn.cursor()
                         cursor.execute("DELETE FROM personel WHERE sira_no = %s", (m_sil_sira,))
                         conn.commit(); conn.close(); st.success("Buluttan tamamen yok edildi!"); time.sleep(0.5); st.rerun()
@@ -342,6 +347,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli, use_container_width=True, hide_index=True)
+
 
 
 
