@@ -82,7 +82,7 @@ yerel_altyapi_kur()
 
 def verileri_yukle_yerel():
     conn = sqlite3.connect(DB_FILE)
-    # 🔥 Yeni personel şak diye en üstte listelensin diye DESC nizamı kalıcı hale getirildi kral
+    # 🔥 GİRİŞİ YAPILAN EN YENİ PERSONEL EN ÜSTE GELSİN DİYE DESC İLE SIRALANDI KRAL
     df_p = pd.read_sql_query("SELECT sira_no as \"Sıra No\", adi_soyadi as \"Adı Soyadı\", tc_no as \"TC Kimlik No\", dogum_tarihi as \"Doğum Tarihi\", ise_giris as \"İşe Giriş Tarihi\", isten_cikis as \"İşten Çıkış Tarihi\", birimi as \"Birimi\", santiye as \"Şantiye Bilgisi\", firma as \"Firma Bilgisi\", durum as \"Giriş/Çıkış Durumu\", calisma_sekli as \"Çalışma Durumu\", fark_gun as \"Çıkış Gün Sayısı\" FROM personel ORDER BY sira_no DESC", conn)
     df_pt = pd.read_sql_query("SELECT id as \"Kayıt ID\", tarih_satir as \"Tarih_Saat\", santiye as \"Şantiye\", personel_adi as \"Personel_Adi\", tc_no as \"TC_Kimlik\", donem_ay as \"Dönem_Ay\", gun_sayisi as \"Çalışılan_Gün_Sayısı\", giren_sef as \"Giren_Sef\" FROM puantaj ORDER BY id DESC", conn)
     conn.close()
@@ -134,10 +134,9 @@ def tarih_formatla(metin):
     temiz = "".join([c for c in str(metin) if c.isdigit()])
     if len(metin) > 8: temiz = temiz[:8]
     if len(temiz) >= 5: return f"{temiz[:2]}.{temiz[2:4]}.{temiz[4:]}"
-    elif len(temiz) >= 3: return f"{metiz[:2]}.{metiz[2:]}"
+    elif len(temiz) >= 3: return f"{temiz[:2]}.{temiz[2:]}"
     return temiz
 
-# Giriş formu nizamı
 if not st.session_state["giris_yapildi"]:
     col_l1, col_l2, col_l3 = st.columns([1.2, 1, 1.2])
     with col_l2:
@@ -168,35 +167,36 @@ else:
             except: pass
             st.rerun()
 
-    # 📊 ŞANTİYE VE MERKEZ METRİK KUTUCUKLARI YENİDEN TASARLANDI KRAL
+    # 📊 METRİK NİZAMI YENİLENDİ - ŞUBELER VE MERKEZ TAM İSTEDİĞİN GİBİ AYRILDI KRAL
     if not df_canli.empty:
         bugun_str = datetime.datetime.now().strftime("%d.%m.%Y")
-        
+        df_metrik_havuz = df_canli[df_canli["Şantiye Bilgisi"] == st.session_state["santiye"]]
+            
         if st.session_state["rol"] == "sube":
-            # 📱 Şubelerde sadece kendi şantiyesinin verileri listelenir
-            df_metrik_havuz = df_canli[df_canli["Şantiye Bilgisi"] == st.session_state["santiye"]]
+            # 📱 Şubelerde tam istediğin nizam: Aktif, Çıkan, Bugün Giren, Bugün Çıkan
             m_aktif = len(df_metrik_havuz[df_metrik_havuz["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"])
             m_cikan = len(df_metrik_havuz[df_metrik_havuz["Giriş/Çıkış Durumu"] == "SGK ÇIKIŞI YAPILDI"])
-            m_bugun_giren = len(df_metrik_havuz[(df_metrik_havuz["İşe Giriş Tarihi"] == bugun_str) & (df_metrik_havuz["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI")])
-            m_bugun_cikan = len(df_metrik_havuz[(df_metrik_havuz["İşten Çıkış Tarihi"] == bugun_str) & (df_metrik_havuz["Giriş/Çıkış Durumu"] == "SGK ÇIKIŞI YAPILDI")])
+            m_bugun_giren = len(df_metrik_havuz[(df_metrik_havuz["İşe Giriş Tarihi"] == bugun_str) & (df_metrik_havuz["Giriş/Çıkış Durumu"].str.contains("GİRİŞ", na=False))])
+            m_bugun_cikan = len(df_metrik_havuz[(df_metrik_havuz["İşten Çıkış Tarihi"] == bugun_str) & (df_metrik_havuz["Giriş/Çıkış Durumu"].str.contains("ÇIKIŞ", na=False))])
 
             met1, met2, met3, met4 = st.columns(4)
-            with met1: st.metric(label="🟢 AKTİF PERSONEL SİZDE", value=m_aktif)
-            with met2: st.metric(label="🔴 ÇIKAN PERSONEL SİZDE", value=m_cikan)
+            with met1: st.metric(label="🟢 AKTİF PERSONEL", value=m_aktif)
+            with met2: st.metric(label="🔴 ÇIKAN PERSONEL", value=m_cikan)
             with met3: st.metric(label="⚡ BUGÜN GİREN", value=m_bugun_giren)
-            with met4: st.metric(label="🛑 BUGÜN ÇIKAN", value=m_bugun_cikan)
+            with met4: st.metric(label="💥 BUGÜN ÇIKAN", value=m_bugun_cikan)
         else:
-            # 🏛️ Merkez hesabında kurumsal tam panel metrikleri listelenir
-            m_aktif = len(df_canli[df_canli["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"])
-            m_cikan = len(df_canli[df_canli["Giriş/Çıkış Durumu"] == "SGK ÇIKIŞI YAPILDI"])
-            m_bugun = len(df_canli[df_canli["İşe Giriş Tarihi"] == bugun_str])
-            m_toplam_aktif = len(df_canli[df_canli["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"])
+            # 🏛️ Merkezde kurumsal makro durum metrikleri kalacak
+            m_merkez_aktif = len(df_canli[df_canli["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"])
+            m_merkez_cikan = len(df_canli[df_canli["Giriş/Çıkış Durumu"] == "SGK ÇIKIŞI YAPILDI"])
+            m_merkez_bugun = len(df_canli[df_canli["İşe Giriş Tarihi"] == bugun_str])
+            m_toplam_havuz = len(df_canli)
 
             met1, met2, met3, met4 = st.columns(4)
-            with met1: st.metric(label="🟢 GÜNCEL AKTİF PERSONEL", value=m_aktif)
-            with met2: st.metric(label="🔴 ÇIKAN PERSONEL SAYISI", value=m_cikan)
-            with met3: st.metric(label="⚡ BUGÜN GİRİŞİ YAPILAN", value=m_bugun)
-            with met4: st.metric(label="🏢 TÜM ŞANTİYELER AKTİF", value=m_toplam_aktif)
+            with met1: st.metric(label="🏢 TOPLAM AKTİF ÇALIŞAN", value=m_merkez_aktif)
+            with met2: st.metric(label="📉 TOPLAM ÇIKIŞ YAPAN", value=m_merkez_cikan)
+            with met3: st.metric(label="🔥 BUGÜN TOPLAM GİRİŞ", value=m_merkez_bugun)
+            with met4: st.metric(label="📋 MASTER HAVUZ MEVCUDU", value=m_toplam_havuz)
+            
         st.markdown("<br>", unsafe_allow_html=True)
 
     if st.session_state["rol"] == "sube":
@@ -217,8 +217,8 @@ else:
                 metin_saf = str(secilen_islem_metni).split(" | ")
                 secilen_sira_no = int(re.sub(r"[^\d]", "", metin_saf[0]))
                 
-                # 🚀 YENİ TALEP: Resmi SGK Link adresi tam istediğin gibi tescilldap olarak güncellendi kral!
-                st.markdown(f'<a href="https://uyg.sgk.gov.tr/SigortaliTescil/amp/loginldap" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP</div></a>', unsafe_allow_html=True)
+                # 🔥 YENİ TALEP: SGK Linki tam istediğin yeni resmi adresle (`/loginldap`) değiştirildi kral
+                st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP</div></a>', unsafe_allow_html=True)
                 if st.button("✅ HAREKETİ RESMİ OLARAK ONAYLA", use_container_width=True):
                     conn = sqlite3.connect(DB_FILE); cursor = conn.cursor()
                     cursor.execute("SELECT durum FROM personel WHERE sira_no = ?", (secilen_sira_no,))
@@ -234,6 +234,7 @@ else:
         varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris, varsayilan_cikis, varsayilan_sira, varsayilan_fark = "", "", "", "", "-", None, ""
         
         df_guncellenebilir_havuz = df_goster[df_goster["Giriş/Çıkış Durumu"].isin(["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)", "SGK GİRİŞİ YAPILDI"])] if not df_goster.empty else pd.DataFrame()
+        
         if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and not df_guncellenebilir_havuz.empty:
             p_guncelle_listesi = df_guncellenebilir_havuz.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
             secilen_g_p = st.selectbox("Personel Seçin", p_guncelle_listesi)
@@ -248,6 +249,31 @@ else:
                     varsayilan_cikis = str(filtered_df.iloc[0]["İşten Çıkış Tarihi"])
                     varsayilan_sira = g_sira_no
                     varsayilan_fark = str(filtered_df.iloc[0]["Çıkış Gün Sayısı"])
+        
+        with st.form("excel_birebir_form", clear_on_submit=False):
+            f_col1, f_col2, f_col3 = st.columns(3)
+            with f_col1:
+                p_adi = st.text_input("ADI SOYADI", value=varsayilan_ad)
+                p_dogum = tarih_formatla(st.text_input("DOĞUM TARİHİ", value=varsayilan_dogum, placeholder="Örn: 01101986"))
+            with f_col2:
+                p_tc = st.text_input("TC KİMLİK NO", max_chars=11, value=varsayilan_tc)
+                p_ise_giris = tarih_formatla(st.text_input("İŞE GİRİŞ TARİHİ", value=varsayilan_giris, placeholder="Örn: 15062026"))
+            with f_col3:
+                p_birim = st.selectbox("BİRİMİ", YENI_BIRIMLER)
+                p_calisma = st.selectbox("ÇALIŞMA DURUMU", ["NORMAL", "EMEKLİ"])
+            
+            f_sub_col1, f_sub_col2, f_sub_col3 = st.columns(3)
+            with f_sub_col1: p_isten_cikis = tarih_formatla(st.text_input("İŞTEN ÇIKIŞ TARİHİ", value=varsayilan_cikis))
+            with f_sub_col2: p_durum = st.selectbox("DURUMU", ["GİRİŞ (BEKLEMEDE)", "ÇIKIŞ (BEKLEMEDE)"], index=1 if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" else 0)
+            with f_sub_col3: p_fark_gun_elle = st.text_input("ÇIKIŞ GÜN SAYISI", value=varsayilan_fark)
+            
+            if st.form_submit_button("💾 VERİYİ YEREL VERİTABANINA KALICI OLARAK İŞLE", use_container_width=True):
+                if p_adi.strip() != "" and p_tc.strip() != "":
+                    conn = sqlite3.connect(DB_FILE); cursor = conn.cursor()
+                    if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and varsayilan_sira is not None:
+                        cursor.execute("DELETE FROM personel WHERE sira_no = ?", (varsayilan_sira,))
+                    cursor.execute("INSERT INTO personel (adi_soyadi, tc_no, dogum_tarihi, ise_giris, isten_cikis, birimi, santiye, firma, durum, calisma_sekli, fark_gun) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
+                    conn.commit(); conn.close(); st.success("✔️ Kalıcı Olarak İşlendi!"); time.sleep(0.5); st.rerun()
         st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
         if not df_goster.empty:
             try: st.dataframe(df_goster.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
@@ -259,7 +285,7 @@ else:
             p_silme_listesi_sube = df_sube_silinebilir.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
             secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
             if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
-                s_sira = int(str(secilen_sil_p_sube).split(" | ").replace("Sıra No: ", "").strip())
+                s_sira = int(str(secilen_sil_p_sube).split(" | ")[0].replace("Sıra No: ", "").strip())
                 conn = sqlite3.connect(DB_FILE); cursor = conn.cursor()
                 cursor.execute("DELETE FROM personel WHERE sira_no = ?", (s_sira,))
                 conn.commit(); conn.close(); st.success("Kayıt silindi!"); st.rerun()
@@ -293,15 +319,16 @@ else:
                 p_silme_listesi = df_p_goster.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']}", axis=1).tolist()
                 secilen_p_sil_id = st.selectbox("Hatalı Kaydı Seçin", p_silme_listesi)
                 if st.button("❌ SEÇİLİ PUANTAJI SİL", use_container_width=True):
-                    sil_id = int(str(secilen_p_sil_id).split(" | ").replace("ID: ", "").strip())
+                    sil_id = int(str(secilen_p_sil_id).split(" | ")[0].replace("ID: ", "").strip())
                     conn = sqlite3.connect(DB_FILE); cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = ?", (sil_id,))
                     conn.commit(); conn.close(); st.success("Silindi!"); time.sleep(0.5); st.rerun()
     elif st.session_state["rol"] in ["merkez", "izleyici"]:
         tab1, tab2 = st.tabs(["👥 CANLI MASTER PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI"])
         with tab1:
+            # 🏢 MAVİ ÖZET PANEL: HANGİ ŞANTİYEDE KAÇ AKTİF PERSONEL VAR ANLIK ÖZET TABLOSU
             if not df_canli.empty:
-                st.markdown("##### 🏛️ ŞANTİYE BAZLI AKTİF PERSONEL DAĞILIMI")
+                st.markdown("##### 🏛️ ŞANTIYE BAZLI AKTİF PERSONEL DAĞILIMI")
                 df_santiye_aktifleri = df_canli[df_canli["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"]
                 if not df_santiye_aktifleri.empty:
                     df_dagilim = df_santiye_aktifleri.groupby("Şantiye Bilgisi").size().reset_index(name="Aktif Personel Sayısı")
@@ -316,6 +343,7 @@ else:
                 yuklenen_dosya = st.file_uploader("Personel Excel Listesini Seçin", type=["xlsx", "xls", "csv"])
                 if yuklenen_dosya is not None:
                     try:
+                        # 🛠️ Codec hatasını tamamen yıkan çoklu otomatik şifreleme süzgeci
                         if yuklenen_dosya.name.endswith('.csv'):
                             try: df_toplu = pd.read_csv(yuklenen_dosya, sep=None, engine='python', dtype=str, encoding='utf-8')
                             except:
@@ -370,7 +398,7 @@ else:
                     m_p_sil_list = df_merkez_p_filtreli.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                     m_secilen_sil = st.selectbox("MASTER SİL: Personel Seçin", m_p_sil_list)
                     if st.button("🔥 SEÇİLİ PERSONELİ SİSTEMDEN KALICI OLARAK SİL", use_container_width=True):
-                        m_sil_sira = int(str(m_secilen_sil).split(" | ").replace("Sıra No: ", "").strip())
+                        m_sil_sira = int(str(m_secilen_sil).split(" | ")[0].replace("Sıra No: ", "").strip())
                         conn = sqlite3.connect(DB_FILE); cursor = conn.cursor()
                         cursor.execute("DELETE FROM personel WHERE sira_no = ?", (m_sil_sira,))
                         conn.commit(); conn.close(); st.success("Sistemden tamamen temizlendi!"); time.sleep(0.5); st.rerun()
@@ -382,6 +410,8 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli, use_container_width=True, hide_index=True)
+
+
 
 
 
