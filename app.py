@@ -61,9 +61,9 @@ st.markdown("""
 def baglanti_adresi_hazirla():
     # Secrets alanındaki adresi alıp dışındaki sinsi tırnakları ayıklayan zırh
     adres = str(st.secrets["database"]["baglanti"]).strip().strip('"').strip("'")
-    # Havuz kilidini kıran port 5432 revizyonu
-    if ":6543" in adres:
-        adres = adres.replace(":6543", ":5432")
+    # 🛠️ Supavisor bağlantı havuzunu aktif eden port 6543 geri yükleme motoru
+    if ":5432" in adres:
+        adres = adres.replace(":5432", ":6543")
     # SSL parametresini güvenli kilitli ekleyen motor
     if "sslmode=" not in adres:
         adres = adres + ("&" if "?" in adres else "?") + "sslmode=require"
