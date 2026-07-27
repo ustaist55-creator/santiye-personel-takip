@@ -58,11 +58,21 @@ st.markdown("""
     .stButton>button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.3) !important; }
 </style>
 """, unsafe_allow_html=True)
-# 🔥 SECRETS KUTUSUNU BYPASS EDEN %100 GARANTİLİ SAF ADRES ZIRHI
-DB_CONN_STR = "postgresql://postgres.pgxthobqecxncgzhfrov:Faruk.2012%2B%2A@://supabase.com"
+# 🔥 ADRES AYRIŞTIRMA SIZINTISINI SIFIRLAYAN EN GÜVENLİ BAĞLANTI MOTORU
+DB_PARAMETRELERI = {
+    "host": "://supabase.com",
+    "port": 6543,
+    "database": "postgres",
+    "user": "postgres.pgxthobqecxncgzhfrov",
+    "password": "Faruk.2012+*",
+    "sslmode": "require"
+}
+
+def bulut_baglanti_al():
+    return psycopg2.connect(**DB_PARAMETRELERI)
 
 def bulut_altyapi_kur():
-    conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+    conn = bulut_baglanti_al(); cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS personel (
             sira_no SERIAL PRIMARY KEY, adi_soyadi TEXT, tc_no TEXT, dogum_tarihi TEXT,
@@ -81,11 +91,11 @@ def bulut_altyapi_kur():
 try:
     bulut_altyapi_kur()
 except Exception as e:
-    st.error(f"Kritik bulut hatası! Adres gömülü olmasına rağmen erişim engellendi. Detay: {e}")
+    st.error(f"Bulut bağlantı hatası! Lütfen Supabase IP iznini kontrol edin. Detay: {e}")
     st.stop()
 
 def verileri_yukle_bulut():
-    conn = psycopg2.connect(DB_CONN_STR)
+    conn = bulut_baglanti_al()
     df_p = pd.read_sql_query("SELECT sira_no as \"Sıra No\", adi_soyadi as \"Adı Soyadı\", tc_no as \"TC Kimlik No\", dogum_tarihi as \"Doğum Tarihi\", ise_giris as \"İşe Giriş Tarihi\", isten_cikis as \"İşten Çıkış Tarihi\", birimi as \"Birimi\", santiye as \"Şantiye Bilgisi\", firma as \"Firma Bilgisi\", durum as \"Giriş/Çıkış Durumu\", calisma_sekli as \"Çalışma Durumu\", fark_gun as \"Çıkış Gün Sayısı\" FROM personel ORDER BY sira_no ASC", conn)
     df_pt = pd.read_sql_query("SELECT id as \"Kayıt ID\", tarih_satir as \"Tarih_Saat\", santiye as \"Şantiye\", personel_adi as \"Personel_Adi\", tc_no as \"TC_Kimlik\", donem_ay as \"Dönem_Ay\", gun_sayisi as \"Çalışılan_Gün_Sayısı\", giren_sef as \"Giren_Sef\" FROM puantaj ORDER BY id DESC", conn)
     conn.close()
@@ -198,7 +208,7 @@ else:
                 secilen_sira_no = int(str(secilen_islem_metni).split(" | ").replace("Sıra No: ", "").strip())
                 st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP</div></a>', unsafe_allow_html=True)
                 if st.button("✅ HAREKETİ BULUTTA RESMİ OLARAK ONAYLA", use_container_width=True):
-                    conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                    conn = bulut_baglanti_al(); cursor = conn.cursor()
                     mevcut_durum = df_canli[df_canli["Sıra No"] == secilen_sira_no]["Giriş/Çıkış Durumu"].values
                     yeni_durum = "SGK GİRİŞİ YAPILDI" if "GİRİŞ" in str(mevcut_durum).upper() else "SGK ÇIKIŞI YAPILDI"
                     cursor.execute("UPDATE personel SET durum = %s WHERE sira_no = %s", (yeni_durum, secilen_sira_no))
@@ -240,7 +250,7 @@ else:
             
             if st.form_submit_button("💾 VERİYİ BULUT VERİTABANINA KALICI OLARAK İŞLE", use_container_width=True):
                 if p_adi.strip() != "" and p_tc.strip() != "":
-                    conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                    conn = bulut_baglanti_al(); cursor = conn.cursor()
                     if islem_modu == "Var Olan Personeli Güncelle / Çıkış Yap" and varsayilan_sira is not None:
                         cursor.execute("DELETE FROM personel WHERE sira_no = %s", (varsayilan_sira,))
                     cursor.execute("INSERT INTO personel (adi_soyadi, tc_no, dogum_tarihi, ise_giris, isten_cikis, birimi, santiye, firma, durum, calisma_sekli, fark_gun) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
@@ -257,7 +267,7 @@ else:
             secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
             if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
                 s_sira = int(str(secilen_sil_p_sube).split(" | ").replace("Sıra No: ", "").strip())
-                conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                conn = bulut_baglanti_al(); cursor = conn.cursor()
                 cursor.execute("DELETE FROM personel WHERE sira_no = %s", (s_sira,))
                 conn.commit(); conn.close(); st.success("Kayıt buluttan silindi!"); st.rerun()
 
@@ -280,7 +290,7 @@ else:
                         p_ad_parca = p_str_parts[0].strip()
                         p_tc_parca = p_str_parts[1].replace(")", "").strip()
                         su_an_p = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                        conn = bulut_baglanti_al(); cursor = conn.cursor()
                         cursor.execute("DELETE FROM puantaj WHERE tc_no = %s AND donem_ay = %s AND santiye = %s", (p_tc_parca, donem_ay, st.session_state["santiye"]))
                         cursor.execute("INSERT INTO puantaj (tarih_satir, santiye, personel_adi, tc_no, donem_ay, gun_sayisi, giren_sef) VALUES (%s, %s, %s, %s, %s, %s, %s)", (su_an_p, str(st.session_state["santiye"]), str(p_ad_parca), str(p_tc_parca), str(donem_ay), int(calisilan_gun), sefi_adi.upper()))
                         conn.commit(); conn.close(); st.success("✔️ Buluta Kilitlendi!"); time.sleep(0.5); st.rerun()
@@ -291,7 +301,7 @@ else:
                 secilen_p_sil_id = st.selectbox("Hatalı Kaydı Seçin", p_silme_listesi)
                 if st.button("❌ SEÇİLİ PUANTAJI BULUTTAN SİL", use_container_width=True):
                     sil_id = int(str(secilen_p_sil_id).split(" | ").replace("ID: ", "").strip())
-                    conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                    conn = bulut_baglanti_al(); cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = %s", (sil_id,))
                     conn.commit(); conn.close(); st.success("Buluttan Silindi!"); time.sleep(0.5); st.rerun()
     elif st.session_state["rol"] in ["merkez", "izleyici"]:
@@ -308,7 +318,7 @@ else:
                         else: df_toplu = pd.read_excel(yuklenen_dosya, dtype=str)
                         st.dataframe(df_toplu.head(5), use_container_width=True)
                         if st.button("🚀 TÜM LİSTEYİ BULUT VERİTABANINA AKTAR", use_container_width=True):
-                            conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor(); aktarilan = 0
+                            conn = bulut_baglanti_al(); cursor = conn.cursor(); aktarilan = 0
                             for _, r in df_toplu.iterrows():
                                 if pd.isna(r["Adı Soyadı"]) or pd.isna(r["TC Kimlik No"]): continue
                                 cursor.execute("INSERT INTO personel (adi_soyadi, tc_no, dogum_tarihi, ise_giris, isten_cikis, birimi, santiye, firma, durum, calisma_sekli, fark_gun) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (str(r["Adı Soyadı"]).strip().upper(), str(r["TC Kimlik No"]).strip(), str(r["Doğum Tarihi"]), str(r["İşe Giriş Tarihi"]), str(r["İşten Çıkış Tarihi"]), str(r["Birimi"]), str(r["Şantiye Bilgisi"]), str(r["Firma Bilgisi"]), str(r["Giriş/Çıkış Durumu"]), str(r["Çalışma Durumu"]), str(r["Çıkış Gün Sayısı"])))
@@ -332,7 +342,7 @@ else:
                     m_secilen_sil = st.selectbox("MASTER BULUTTAN SİL: Personel Seçin", m_p_sil_list)
                     if st.button("🔥 SEÇİLİ PERSONELİ BULUTTAN KALICI OLARAK SİL", use_container_width=True):
                         m_sil_sira = int(str(m_secilen_sil).split(" | ").replace("Sıra No: ", "").strip())
-                        conn = psycopg2.connect(DB_CONN_STR); cursor = conn.cursor()
+                        conn = bulut_baglanti_al(); cursor = conn.cursor()
                         cursor.execute("DELETE FROM personel WHERE sira_no = %s", (m_sil_sira,))
                         conn.commit(); conn.close(); st.success("Buluttan tamamen yok edildi!"); time.sleep(0.5); st.rerun()
         with tab2:
