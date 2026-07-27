@@ -9,7 +9,7 @@ from psycopg2 import extras
 import re
 import extra_streamlit_components as stx
 
-# Sayfa Ayarları - %100 Tam Ekran ve Sola-Sağa Sıfır Boşluk Nizamı
+# Sayfa Ayarları - %100 Tam Ekran and Sola-Sağa Sıfır Boşluk Nizamı
 st.set_page_config(page_title="PERSONEL TAKİP", layout="wide")
 
 st.markdown("""
@@ -58,12 +58,10 @@ st.markdown("""
     .stButton>button:hover { transform: translateY(-1px) !important; box-shadow: 0 6px 12px rgba(43, 108, 176, 0.3) !important; }
 </style>
 """, unsafe_allow_html=True)
-# BULUT VERİTABANI BAĞLANTI AYARI
-DB_CONN_STR = st.secrets["database"]["baglanti"]
-
 def baglanti_adresi_hazirla():
+    # Streamlit Secrets alanından adresi çeken kurşun geçirmez anahtar
+    adres = st.secrets["database"]["baglanti"]
     # 🛠️ Güvenlik duvarını yıkan akıllı port 5432 tamir yama motoru
-    adres = DB_CONN_STR
     if ":6543" in adres:
         adres = adres.replace(":6543", ":5432")
     if "sslmode=" not in adres:
@@ -202,7 +200,7 @@ else:
             bekleyen_listesi = df_bekleyen_sayi.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']} ({r['Şantiye Bilgisi']})", axis=1).tolist()
             secilen_islem_metni = st.selectbox("Onaylanacak Kartı Seçin", bekleyen_listesi)
             if secilen_islem_metni:
-                secilen_sira_no = int(str(secilen_islem_metni).split(" | ")[0].replace("Sıra No: ", "").strip())
+                secilen_sira_no = int(str(secilen_islem_metni).split(" | ").replace("Sıra No: ", "").strip())
                 st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP</div></a>', unsafe_allow_html=True)
                 if st.button("✅ HAREKETİ BULUTTA RESMİ OLARAK ONAYLA", use_container_width=True):
                     baglanti_adresi = baglanti_adresi_hazirla()
@@ -222,10 +220,10 @@ else:
             p_guncelle_listesi = df_guncellenebilir_havuz.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
             secilen_g_p = st.selectbox("Personel Seçin", p_guncelle_listesi)
             if secilen_g_p:
-                g_sira_no = int(str(secilen_g_p).split(" | ")[0].replace("Sıra No: ", "").strip())
+                g_sira_no = int(str(secilen_g_p).split(" | ").replace("Sıra No: ", "").strip())
                 filtered_df = df_guncellenebilir_havuz[df_guncellenebilir_havuz["Sıra No"] == g_sira_no]
                 if not filtered_df.empty:
-                    p_satir = filtered_df.iloc[0]
+                    p_satir = filtered_df.iloc
                     varsayilan_ad, varsayilan_tc, varsayilan_dogum, varsayilan_giris = str(p_satir["Adı Soyadı"]), str(p_satir["TC Kimlik No"]), str(p_satir["Doğum Tarihi"]), str(p_satir["İşe Giriş Tarihi"])
                     varsayilan_cikis, varsayilan_sira, varsayilan_fark = str(p_satir["İşten Çıkış Tarihi"]), g_sira_no, str(p_satir["Çıkış Gün Sayısı"])
         
@@ -265,7 +263,7 @@ else:
             p_silme_listesi_sube = df_sube_silinebilir.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
             secilen_sil_p_sube = st.selectbox("Silmek İstediğiniz Personeli Seçin", p_silme_listesi_sube, key="sube_p_sil")
             if st.button("❌ SEÇİLİ PERSONELİ LİSTEDEN KALDIR", use_container_width=True):
-                s_sira = int(str(secilen_sil_p_sube).split(" | ")[0].replace("Sıra No: ", "").strip())
+                s_sira = int(str(secilen_sil_p_sube).split(" | ").replace("Sıra No: ", "").strip())
                 baglanti_adresi = baglanti_adresi_hazirla()
                 conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                 cursor.execute("DELETE FROM personel WHERE sira_no = %s", (s_sira,))
@@ -301,7 +299,7 @@ else:
                 p_silme_listesi = df_p_goster.apply(lambda r: f"ID: {r['Kayıt ID']} | {r['Personel_Adi']}", axis=1).tolist()
                 secilen_p_sil_id = st.selectbox("Hatalı Kaydı Seçin", p_silme_listesi)
                 if st.button("❌ SEÇİLİ PUANTAJI BULUTTAN SİL", use_container_width=True):
-                    sil_id = int(str(secilen_p_sil_id).split(" | ")[0].replace("ID: ", "").strip())
+                    sil_id = int(str(secilen_p_sil_id).split(" | ").replace("ID: ", "").strip())
                     baglanti_adresi = baglanti_adresi_hazirla()
                     conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                     cursor.execute("DELETE FROM puantaj WHERE id = %s", (sil_id,))
@@ -344,7 +342,7 @@ else:
                     m_p_sil_list = df_merkez_p_filtreli.apply(lambda r: f"Sıra No: {r['Sıra No']} | {r['Adı Soyadı']}", axis=1).tolist()
                     m_secilen_sil = st.selectbox("MASTER BULUTTAN SİL: Personel Seçin", m_p_sil_list)
                     if st.button("🔥 SEÇİLİ PERSONELİ BULUTTAN KALICI OLARAK SİL", use_container_width=True):
-                        m_sil_sira = int(str(m_secilen_sil).split(" | ")[0].replace("Sıra No: ", "").strip())
+                        m_sil_sira = int(str(m_secilen_sil).split(" | ").replace("Sıra No: ", "").strip())
                         baglanti_adresi = baglanti_adresi_hazirla()
                         conn = psycopg2.connect(baglanti_adresi); cursor = conn.cursor()
                         cursor.execute("DELETE FROM personel WHERE sira_no = %s", (m_sil_sira,))
@@ -357,6 +355,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli, use_container_width=True, hide_index=True)
+
 
 
 
