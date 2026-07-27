@@ -82,7 +82,7 @@ yerel_altyapi_kur()
 
 def verileri_yukle_yerel():
     conn = sqlite3.connect(DB_FILE)
-    # 🔥 GİRİŞİ YAPILAN EN YENİ PERSONEL EN ÜSTE GELSİN DİYE DESC İLE SIRALANDI KRAL
+    # 🔥 Bireysel yüklenen en yeni personel en üste gelsin diye DESC kuralı korundu kral
     df_p = pd.read_sql_query("SELECT sira_no as \"Sıra No\", adi_soyadi as \"Adı Soyadı\", tc_no as \"TC Kimlik No\", dogum_tarihi as \"Doğum Tarihi\", ise_giris as \"İşe Giriş Tarihi\", isten_cikis as \"İşten Çıkış Tarihi\", birimi as \"Birimi\", santiye as \"Şantiye Bilgisi\", firma as \"Firma Bilgisi\", durum as \"Giriş/Çıkış Durumu\", calisma_sekli as \"Çalışma Durumu\", fark_gun as \"Çıkış Gün Sayısı\" FROM personel ORDER BY sira_no DESC", conn)
     df_pt = pd.read_sql_query("SELECT id as \"Kayıt ID\", tarih_satir as \"Tarih_Saat\", santiye as \"Şantiye\", personel_adi as \"Personel_Adi\", tc_no as \"TC_Kimlik\", donem_ay as \"Dönem_Ay\", gun_sayisi as \"Çalışılan_Gün_Sayısı\", giren_sef as \"Giren_Sef\" FROM puantaj ORDER BY id DESC", conn)
     conn.close()
@@ -137,6 +137,14 @@ def tarih_formatla(metin):
     elif len(temiz) >= 3: return f"{temiz[:2]}.{temiz[2:]}"
     return temiz
 
+# 📥 EXCEL DIŞA AKTARIM FONKSİYONU - %100 TÜRKÇE VE DÜZGÜN FORMATLI KRAL
+def excel_disa_aktar(df_data):
+    if df_data.empty: return None
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_data.to_excel(writer, index=False, sheet_name='Personel Listesi')
+    return output.getvalue()
+
 if not st.session_state["giris_yapildi"]:
     col_l1, col_l2, col_l3 = st.columns([1.2, 1, 1.2])
     with col_l2:
@@ -167,13 +175,13 @@ else:
             except: pass
             st.rerun()
 
-    # 📊 METRİK NİZAMI YENİLENDİ - ŞUBELER VE MERKEZ TAM İSTEDİĞİN GİBİ AYRILDI KRAL
+    # 📊 METRİK NİZAMI AYRILDI - ŞUBELERE VE MERKEZE GÖRE ÖZEL KUTULAR KRAL
     if not df_canli.empty:
         bugun_str = datetime.datetime.now().strftime("%d.%m.%Y")
         df_metrik_havuz = df_canli[df_canli["Şantiye Bilgisi"] == st.session_state["santiye"]]
             
         if st.session_state["rol"] == "sube":
-            # 📱 Şubelerde tam istediğin nizam: Aktif, Çıkan, Bugün Giren, Bugün Çıkan
+            # Şubelerde sadece kendi şantiyesinin verileri: Aktif, Çıkan, Bugün Giren, Bugün Çıkan
             m_aktif = len(df_metrik_havuz[df_metrik_havuz["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"])
             m_cikan = len(df_metrik_havuz[df_metrik_havuz["Giriş/Çıkış Durumu"] == "SGK ÇIKIŞI YAPILDI"])
             m_bugun_giren = len(df_metrik_havuz[(df_metrik_havuz["İşe Giriş Tarihi"] == bugun_str) & (df_metrik_havuz["Giriş/Çıkış Durumu"].str.contains("GİRİŞ", na=False))])
@@ -185,7 +193,7 @@ else:
             with met3: st.metric(label="⚡ BUGÜN GİREN", value=m_bugun_giren)
             with met4: st.metric(label="💥 BUGÜN ÇIKAN", value=m_bugun_cikan)
         else:
-            # 🏛️ Merkezde kurumsal makro durum metrikleri kalacak
+            # Merkezde tüm holding makro durum kutuları aktif kalıyor kral
             m_merkez_aktif = len(df_canli[df_canli["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"])
             m_merkez_cikan = len(df_canli[df_canli["Giriş/Çıkış Durumu"] == "SGK ÇIKIŞI YAPILDI"])
             m_merkez_bugun = len(df_canli[df_canli["İşe Giriş Tarihi"] == bugun_str])
@@ -217,7 +225,7 @@ else:
                 metin_saf = str(secilen_islem_metni).split(" | ")
                 secilen_sira_no = int(re.sub(r"[^\d]", "", metin_saf[0]))
                 
-                # 🔥 YENİ TALEP: SGK Linki tam istediğin yeni resmi adresle (`/loginldap`) değiştirildi kral
+                # 🏛️ İSTEDİĞİN EN YENİ RESMİ SGK ADRESİ BURAYA ÇAKILDI KRAL
                 st.markdown(f'<a href="https://sgk.gov.tr" target="_blank" style="text-decoration:none;"><div style="background-color:#D32F2F;color:white;padding:14px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:15px;font-size:16px;">🚀 RESMİ SGK SİTESİNE GİT VE İŞLEMİ YAP</div></a>', unsafe_allow_html=True)
                 if st.button("✅ HAREKETİ RESMİ OLARAK ONAYLA", use_container_width=True):
                     conn = sqlite3.connect(DB_FILE); cursor = conn.cursor()
@@ -275,7 +283,13 @@ else:
                     cursor.execute("INSERT INTO personel (adi_soyadi, tc_no, dogum_tarihi, ise_giris, isten_cikis, birimi, santiye, firma, durum, calisma_sekli, fark_gun) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (p_adi.strip().upper(), str(p_tc.strip()), str(p_dogum), str(p_ise_giris), str(p_isten_cikis), str(p_birim), str(st.session_state["santiye"]), str(st.session_state["firma"]), str(p_durum), str(p_calisma), str(p_fark_gun_elle).upper()))
                     conn.commit(); conn.close(); st.success("✔️ Kalıcı Olarak İşlendi!"); time.sleep(0.5); st.rerun()
         st.markdown("##### 📋 ŞANTİYENİZDEKİ CANLI PERSONEL HAVUZU")
+        
+        # 📥 ŞANTİYELERE ÖZEL EXCEL DIŞA AKTARIM BUTONU ENTEGRE EDİLDİ KRAL
         if not df_goster.empty:
+            excel_dosyasi_sube = excel_disa_aktar(df_goster)
+            if excel_dosyasi_sube:
+                st.download_button(label="📥 CANLI PERSONEL LİSTESİNİ EXCEL OLARAK İNDİR", data=excel_dosyasi_sube, file_name=f"{st.session_state['santiye']}_personel_listesi.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            
             try: st.dataframe(df_goster.style.map(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
             except: st.dataframe(df_goster.style.applymap(renk_ayarla, subset=["Giriş/Çıkış Durumu"]), use_container_width=True, hide_index=True)
 
@@ -326,16 +340,15 @@ else:
     elif st.session_state["rol"] in ["merkez", "izleyici"]:
         tab1, tab2 = st.tabs(["👥 CANLI MASTER PERSONEL HAVUZU", "📅 TOPLU ŞANTİYE PUANTAJLARI"])
         with tab1:
-            # 🏢 MAVİ ÖZET PANEL: HANGİ ŞANTİYEDE KAÇ AKTİF PERSONEL VAR ANLIK ÖZET TABLOSU
             if not df_canli.empty:
-                st.markdown("##### 🏛️ ŞANTIYE BAZLI AKTİF PERSONEL DAĞILIMI")
+                st.markdown("##### 🏛️ ŞANTİYE BAZLI AKTİF PERSONEL DAĞILIMI")
                 df_santiye_aktifleri = df_canli[df_canli["Giriş/Çıkış Durumu"] == "SGK GİRİŞİ YAPILDI"]
                 if not df_santiye_aktifleri.empty:
                     df_dagilim = df_santiye_aktifleri.groupby("Şantiye Bilgisi").size().reset_index(name="Aktif Personel Sayısı")
                     df_dagilim.columns = ["Şantiye Adı", "Toplam Aktif Çalışan"]
                     st.dataframe(df_dagilim, use_container_width=True, hide_index=True)
                 else:
-                    st.info("💡 Şu an şantiyelerde SGK girişi resmi olarak onaylanmış aktif çalışan bulunmamaktadır.")
+                    st.info("💡 Şu an şantiyelerde resmi aktif çalışan bulunmamaktadır.")
                 st.markdown("---")
 
             with st.expander("📥 EXCEL / CSV DOSYASINDAN TOPLU PERSONEL AKTARIMI (MERKEZ ÖZEL)"):
@@ -343,7 +356,6 @@ else:
                 yuklenen_dosya = st.file_uploader("Personel Excel Listesini Seçin", type=["xlsx", "xls", "csv"])
                 if yuklenen_dosya is not None:
                     try:
-                        # 🛠️ Codec hatasını tamamen yıkan çoklu otomatik şifreleme süzgeci
                         if yuklenen_dosya.name.endswith('.csv'):
                             try: df_toplu = pd.read_csv(yuklenen_dosya, sep=None, engine='python', dtype=str, encoding='utf-8')
                             except:
@@ -355,9 +367,13 @@ else:
                         df_toplu.columns = df_toplu.columns.str.strip()
                         st.dataframe(df_toplu.head(5), use_container_width=True)
                         
-                        if st.button("🚀 TÜM LİSTEYİ SİSTEME AKTAR", use_container_width=True):
+                        if st.button("🚀 TÜM LİSTEYİ TAM EXCEL SIRASIYLA SİSTEME AKTAR", use_container_width=True):
                             conn = sqlite3.connect(DB_FILE); cursor = conn.cursor(); aktarilan = 0
-                            for _, r in df_toplu.iterrows():
+                            
+                            # 🔥 KARIŞMAYI ÖNLEN YENİ NİZAM: Excel'deki orijinal nizam korunsun diye listeyi tersten (reverse) okuyarak işliyoruz kral!
+                            df_toplu_ters = df_toplu.iloc[::-1]
+                            
+                            for _, r in df_toplu_ters.iterrows():
                                 name_col = "Adı Soyadı" if "Adı Soyadı" in df_toplu.columns else df_toplu.columns[0]
                                 tc_col = "TC Kimlik No" if "TC Kimlik No" in df_toplu.columns else df_toplu.columns[1]
                                 
@@ -380,8 +396,14 @@ else:
                                     str(r.get("Çıkış Gün Sayısı", "-"))
                                 ))
                                 aktarilan += 1
-                            conn.commit(); conn.close(); st.success(f"✔️ {aktarilan} Personel Kaydedildi!"); time.sleep(0.5); st.rerun()
+                            conn.commit(); conn.close(); st.success(f"✔️ {aktarilan} Personel Tam Sırasıyla Kaydedildi!"); time.sleep(0.5); st.rerun()
                     except Exception as ex: st.error(f"❌ Hata: {ex}")
+
+            # 📥 MERKEZ İÇİN EXCEL DIŞA AKTARIM (İNDİRME) BUTONU
+            if not df_merkez_p_filtreli.empty:
+                excel_dosyasi_merkez = excel_disa_aktar(df_merkez_p_filtreli)
+                if excel_dosyasi_merkez:
+                    st.download_button(label="📥 CANLI PERSONEL LİSTESİNİ EXCEL OLARAK İNDİR", data=excel_dosyasi_merkez, file_name="merkez_master_personel_listesi.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             f_col1, f_col2 = st.columns(2)
             with f_col1: secilen_f_santiye = st.selectbox("Şantiye Şube Seçimi", ["HEPSİ", "CANİK", "GAZİETHEMPAŞA", "OFİS", "TEPECİK ABLOK", "POLATLI", "GİRESUN", "İSTANBUL", "MORFOLOJİ", "YAYLADERE", "MERKZE İŞYERİ-2", "KILIÇDEDE2"])
@@ -410,6 +432,7 @@ else:
             if secilen_fp_santiye != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Şantiye"] == secilen_fp_santiye]
             if secilen_fp_ay != "HEPSİ": df_merkez_pt_filtreli = df_merkez_pt_filtreli[df_merkez_pt_filtreli["Dönem_Ay"] == secilen_fp_ay]
             st.dataframe(df_merkez_pt_filtreli, use_container_width=True, hide_index=True)
+
 
 
 
